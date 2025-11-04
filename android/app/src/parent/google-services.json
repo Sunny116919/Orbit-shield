@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "110632506055",
+    "project_id": "orbit-shield",
+    "storage_bucket": "orbit-shield.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:110632506055:android:db016fa861bac2221b24e2",
+        "android_client_info": {
+          "package_name": "com.safety.orbit_shield.parent"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCRyS2d_Rr_tr6HJzrpXyTDA-6__LD9ZuY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

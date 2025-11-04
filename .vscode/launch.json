@@ -1,0 +1,25 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Orbit Shield (Parent)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/parent/main_parent.dart",
+            "args": [
+                "--flavor",
+                "parent"
+            ]
+        },
+        {
+            "name": "Orbit Shield (Child)",
+            "request": "launch",
+            "type": "dart",
+            "program": "lib/child/main_child.dart",
+            "args": [
+                "--flavor",
+                "child"
+            ]
+        }
+    ]
+}
