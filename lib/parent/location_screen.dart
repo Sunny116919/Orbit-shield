@@ -37,8 +37,10 @@ class _LocationScreenState extends State<LocationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text('${widget.deviceName} - Location'),
+        backgroundColor: Colors.white,
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

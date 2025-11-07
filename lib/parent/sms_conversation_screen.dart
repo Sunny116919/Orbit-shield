@@ -16,7 +16,9 @@ class SmsConversationScreen extends StatelessWidget {
 
   // Helper function to check if two dates are on the same day
   bool _isSameDay(DateTime dateA, DateTime dateB) {
-    return dateA.year == dateB.year && dateA.month == dateB.month && dateA.day == dateB.day;
+    return dateA.year == dateB.year &&
+        dateA.month == dateB.month &&
+        dateA.day == dateB.day;
   }
 
   @override
@@ -44,7 +46,9 @@ class SmsConversationScreen extends StatelessWidget {
     // ^^^ END OF NEW LOGIC ^^^
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -52,7 +56,10 @@ class SmsConversationScreen extends StatelessWidget {
             if (contactName != null)
               Text(
                 contactAddress,
-                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.normal,
+                ),
               ),
           ],
         ),
@@ -66,9 +73,7 @@ class SmsConversationScreen extends StatelessWidget {
           // --- If the item is a date, build a date separator chip ---
           if (item is DateTime) {
             return Center(
-              child: Chip(
-                label: Text(DateFormat.yMMMMd().format(item)),
-              ),
+              child: Chip(label: Text(DateFormat.yMMMMd().format(item))),
             );
           }
 
@@ -77,16 +82,24 @@ class SmsConversationScreen extends StatelessWidget {
           final body = message['body'] ?? 'No content';
           final isSent = message['kind'] == 'sent';
           final date = (message['date'] as Timestamp?)?.toDate();
-          
+
           // vvv NEW: CHAT BUBBLE WRAPPED IN A COLUMN FOR TIMESTAMP vvv
           return Align(
             alignment: isSent ? Alignment.centerRight : Alignment.centerLeft,
             child: Column(
-              crossAxisAlignment: isSent ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              crossAxisAlignment: isSent
+                  ? CrossAxisAlignment.end
+                  : CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                  margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 10,
+                    horizontal: 14,
+                  ),
+                  margin: const EdgeInsets.symmetric(
+                    vertical: 4,
+                    horizontal: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: isSent ? Colors.blue[200] : Colors.grey[300],
                     borderRadius: BorderRadius.circular(20),
@@ -100,7 +113,7 @@ class SmsConversationScreen extends StatelessWidget {
                       DateFormat.jm().format(date.toLocal()), // e.g., 5:40 PM
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
-                  )
+                  ),
               ],
             ),
           );

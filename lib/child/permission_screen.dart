@@ -134,6 +134,7 @@ class _PermissionScreenState extends State<PermissionScreen>
     // _isNotificationAccessGranted; // Removed
 
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),

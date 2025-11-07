@@ -36,7 +36,7 @@ class _AppUsageScreenState extends State<AppUsageScreen>
     _tabController.dispose(); // Dispose TabController
     super.dispose();
   }
-  
+
   // --- ADDED HELPER FUNCTION ---
   String _formatDuration(Duration duration) {
     if (duration.inMinutes == 0) return '0m';
@@ -91,7 +91,7 @@ class _AppUsageScreenState extends State<AppUsageScreen>
         // Only show total for Today and 24h, not 30d
         final bool showTotal = firestoreDocName != 'last_30d_stats';
         // --- END TOTAL CALCULATION ---
-        
+
         apps.sort(
           (a, b) => (b['totalUsageMinutes'] ?? 0).compareTo(
             a['totalUsageMinutes'] ?? 0,
@@ -133,8 +133,10 @@ class _AppUsageScreenState extends State<AppUsageScreen>
             // --- ADDED TOTALS WIDGET ---
             if (showTotal)
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(vertical: 8.0, horizontal: 16.0),
+                padding: const EdgeInsets.symmetric(
+                  vertical: 8.0,
+                  horizontal: 16.0,
+                ),
                 child: Column(
                   children: [
                     Text(
@@ -144,17 +146,15 @@ class _AppUsageScreenState extends State<AppUsageScreen>
                     const SizedBox(height: 4),
                     Text(
                       _formatDuration(totalDuration),
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
+                      style: Theme.of(context).textTheme.headlineSmall
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                   ],
                 ),
               ),
-            // --- END ADDED WIDGET ---
 
+            // --- END ADDED WIDGET ---
             if (lastUpdated != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
@@ -216,8 +216,10 @@ class _AppUsageScreenState extends State<AppUsageScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text('${widget.deviceName} - App Usage'),
+        backgroundColor: Colors.white,
         bottom: TabBar(
           // Add TabBar here
           controller: _tabController,

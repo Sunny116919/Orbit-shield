@@ -18,8 +18,10 @@ class ClipboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text('${deviceName} - Clipboard'),
+        backgroundColor: Colors.white,
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
@@ -32,8 +34,11 @@ class ClipboardScreen extends StatelessWidget {
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
-          final clipboardText = data['clipboardText'] as String? ?? "No data yet. Refresh from the previous screen.";
-          final lastUpdated = (data['clipboardLastUpdated'] as Timestamp?)?.toDate();
+          final clipboardText =
+              data['clipboardText'] as String? ??
+              "No data yet. Refresh from the previous screen.";
+          final lastUpdated = (data['clipboardLastUpdated'] as Timestamp?)
+              ?.toDate();
 
           return Padding(
             padding: const EdgeInsets.all(16.0),
@@ -64,7 +69,9 @@ class ClipboardScreen extends StatelessWidget {
                   onPressed: () {
                     Clipboard.setData(ClipboardData(text: clipboardText));
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Copied to your clipboard!')),
+                      const SnackBar(
+                        content: Text('Copied to your clipboard!'),
+                      ),
                     );
                   },
                 ),

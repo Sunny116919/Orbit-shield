@@ -587,8 +587,22 @@ Future<void> _fetchAndUploadDailyReports(String deviceId) async {
     for (int i = 0; i < 30; i++) {
       final DateTime dayToQuery = now.subtract(Duration(days: i));
 
-      final DateTime startTime = DateTime(dayToQuery.year, dayToQuery.month, dayToQuery.day, 0, 0, 0);
-      final DateTime endTime = DateTime(dayToQuery.year, dayToQuery.month, dayToQuery.day, 23, 59, 59);
+      final DateTime startTime = DateTime(
+        dayToQuery.year,
+        dayToQuery.month,
+        dayToQuery.day,
+        0,
+        0,
+        0,
+      );
+      final DateTime endTime = DateTime(
+        dayToQuery.year,
+        dayToQuery.month,
+        dayToQuery.day,
+        23,
+        59,
+        59,
+      );
       final String dateString = DateFormat('yyyy-MM-dd').format(startTime);
 
       // Get usage for this specific day
@@ -604,10 +618,7 @@ Future<void> _fetchAndUploadDailyReports(String deviceId) async {
       }
 
       // Add this day's data to our list
-      dailyReports.add({
-        'date': dateString,
-        'totalUsageMinutes': totalMinutes,
-      });
+      dailyReports.add({'date': dateString, 'totalUsageMinutes': totalMinutes});
     }
 
     // After the loop, upload the entire list to a single document
@@ -617,9 +628,9 @@ Future<void> _fetchAndUploadDailyReports(String deviceId) async {
         .collection('app_usage')
         .doc('daily_30d_report') // <-- New document
         .set({
-      'reports': dailyReports, // This is a LIST of all 30 days
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
+          'reports': dailyReports, // This is a LIST of all 30 days
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
 
     print('DAILY REPORT (On-Demand): Upload complete.');
   } catch (e) {

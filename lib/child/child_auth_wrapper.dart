@@ -36,6 +36,7 @@ class ChildAuthWrapper extends StatelessWidget {
         // While we're checking, show a loading spinner
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
+            backgroundColor: Colors.white,
             body: Center(child: CircularProgressIndicator()),
           );
         }

@@ -15,8 +15,10 @@ class InstalledAppsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text('${deviceName} - Installed Apps'),
+        backgroundColor: Colors.white,
         // No refresh button here, handled by DeviceDetailScreen
       ),
       body: StreamBuilder<DocumentSnapshot>(
@@ -24,7 +26,7 @@ class InstalledAppsScreen extends StatelessWidget {
             .collection('child_devices')
             .doc(deviceId)
             .collection('installed_apps') // New subcollection
-            .doc('list')                  // New document name
+            .doc('list') // New document name
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -47,7 +49,11 @@ class InstalledAppsScreen extends StatelessWidget {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           final apps = List<Map<String, dynamic>>.from(data['apps'] ?? []);
           // Sort alphabetically by app name, ignoring case
-          apps.sort((a, b) => (a['appName'] ?? '').toLowerCase().compareTo((b['appName'] ?? '').toLowerCase()));
+          apps.sort(
+            (a, b) => (a['appName'] ?? '').toLowerCase().compareTo(
+              (b['appName'] ?? '').toLowerCase(),
+            ),
+          );
           final lastUpdated = (data['updatedAt'] as Timestamp?)?.toDate();
 
           return Column(

@@ -40,21 +40,24 @@ class SosAlertScreen extends StatelessWidget {
   }
 
   void _cancelSosAlert() {
-    FirebaseFirestore.instance
-        .collection('child_devices')
-        .doc(deviceId)
-        .update({'sos_trigger': false}); // Update the correct field
+    FirebaseFirestore.instance.collection('child_devices').doc(deviceId).update(
+      {'sos_trigger': false},
+    ); // Update the correct field
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('SOS EMERGENCY'),
         backgroundColor: Colors.red,
       ),
       body: StreamBuilder<DocumentSnapshot>(
-        stream: FirebaseFirestore.instance.collection('child_devices').doc(deviceId).snapshots(),
+        stream: FirebaseFirestore.instance
+            .collection('child_devices')
+            .doc(deviceId)
+            .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Center(child: CircularProgressIndicator());
@@ -64,10 +67,11 @@ class SosAlertScreen extends StatelessWidget {
           // --- MODIFIED: Use the standard location fields ---
           final isSosActive = data['sos_trigger'] == true;
           final geoPoint = data['currentLocation'] as GeoPoint?;
-          final timestamp = (data['locationLastUpdated'] as Timestamp?)?.toDate();
-          
+          final timestamp = (data['locationLastUpdated'] as Timestamp?)
+              ?.toDate();
+
           if (!isSosActive) {
-             return Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -76,14 +80,16 @@ class SosAlertScreen extends StatelessWidget {
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
                     child: const Text('Go Back'),
-                  )
+                  ),
                 ],
               ),
             );
           }
 
           if (geoPoint == null || timestamp == null) {
-            return const Center(child: Text('Waiting for child\'s location data...'));
+            return const Center(
+              child: Text('Waiting for child\'s location data...'),
+            );
           }
 
           return Padding(
@@ -92,33 +98,49 @@ class SosAlertScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.red, size: 100),
+                const Icon(
+                  Icons.warning_amber_rounded,
+                  color: Colors.red,
+                  size: 100,
+                ),
                 const SizedBox(height: 20),
                 Text(
                   'EMERGENCY ALERT FROM',
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.red),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.headlineSmall?.copyWith(color: Colors.red),
                 ),
                 Text(
                   deviceName.toUpperCase(),
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
                 const SizedBox(height: 20),
                 Card(
                   elevation: 4,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   child: Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       children: [
-                        Text('Last known location updated at: ${DateFormat.yMd().add_jm().format(timestamp.toLocal())}'),
+                        Text(
+                          'Last known location updated at: ${DateFormat.yMd().add_jm().format(timestamp.toLocal())}',
+                        ),
                         const SizedBox(height: 10),
                         FutureBuilder<String>(
                           future: _getAddressFromGeoPoint(geoPoint),
                           builder: (context, addressSnapshot) {
-                            if (addressSnapshot.connectionState == ConnectionState.waiting) {
-                              return const Padding(padding: EdgeInsets.all(8.0), child: CircularProgressIndicator());
+                            if (addressSnapshot.connectionState ==
+                                ConnectionState.waiting) {
+                              return const Padding(
+                                padding: EdgeInsets.all(8.0),
+                                child: CircularProgressIndicator(),
+                              );
                             }
                             return Text(
                               addressSnapshot.data ?? "Could not get address",
@@ -133,14 +155,15 @@ class SosAlertScreen extends StatelessWidget {
                 ),
                 const Spacer(),
                 ElevatedButton.icon(
-                  onPressed: () => _launchMapsUrl(geoPoint.latitude, geoPoint.longitude),
+                  onPressed: () =>
+                      _launchMapsUrl(geoPoint.latitude, geoPoint.longitude),
                   icon: const Icon(Icons.map),
                   label: const Text('VIEW LOCATION ON MAP'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.blue,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 16)
+                    textStyle: const TextStyle(fontSize: 16),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -153,7 +176,7 @@ class SosAlertScreen extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Colors.grey),
                     padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 16)
+                    textStyle: const TextStyle(fontSize: 16),
                   ),
                 ),
               ],

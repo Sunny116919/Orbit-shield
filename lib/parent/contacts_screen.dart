@@ -15,8 +15,10 @@ class ContactsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text('${deviceName} - Contacts'),
+        backgroundColor: Colors.white,
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
@@ -44,10 +46,15 @@ class ContactsScreen extends StatelessWidget {
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
-          final entries = List<Map<String, dynamic>>.from(data['entries'] ?? []);
+          final entries = List<Map<String, dynamic>>.from(
+            data['entries'] ?? [],
+          );
           final lastUpdated = (data['updatedAt'] as Timestamp?)?.toDate();
-          entries.sort((a, b) => (a['displayName'] ?? '').toLowerCase().compareTo((b['displayName'] ?? '').toLowerCase()));
-
+          entries.sort(
+            (a, b) => (a['displayName'] ?? '').toLowerCase().compareTo(
+              (b['displayName'] ?? '').toLowerCase(),
+            ),
+          );
 
           return Column(
             children: [
@@ -71,7 +78,9 @@ class ContactsScreen extends StatelessWidget {
                     return ListTile(
                       leading: CircleAvatar(
                         child: Text(
-                          displayName.isNotEmpty ? displayName[0].toUpperCase() : '#',
+                          displayName.isNotEmpty
+                              ? displayName[0].toUpperCase()
+                              : '#',
                         ),
                       ),
                       title: Text(displayName),

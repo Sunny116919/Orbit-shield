@@ -70,7 +70,11 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.deviceName)),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text(widget.deviceName),
+        backgroundColor: Colors.white,
+      ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('child_devices')

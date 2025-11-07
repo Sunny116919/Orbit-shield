@@ -18,7 +18,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
     String password = _passwordController.text.trim();
 
     if (email.isNotEmpty && password.isNotEmpty) {
-      final user = await _authService.signUpWithEmailAndPassword(email, password);
+      final user = await _authService.signUpWithEmailAndPassword(
+        email,
+        password,
+      );
       if (user != null && mounted) {
         // If sign up is successful, you might want to pop back to the login screen
         // or navigate to the dashboard. For now, we'll show a success message.
@@ -49,8 +52,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('Create an Account'),
+        backgroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -60,20 +65,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
           children: [
             TextFormField(
               controller: _emailController,
-              decoration: const InputDecoration(labelText: 'Email', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                border: OutlineInputBorder(),
+              ),
               keyboardType: TextInputType.emailAddress,
             ),
             const SizedBox(height: 16.0),
             TextFormField(
               controller: _passwordController,
-              decoration: const InputDecoration(labelText: 'Password', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(),
+              ),
               obscureText: true,
             ),
             const SizedBox(height: 24.0),
-            ElevatedButton(
-              onPressed: _signUp,
-              child: const Text('Sign Up'),
-            ),
+            ElevatedButton(onPressed: _signUp, child: const Text('Sign Up')),
             TextButton(
               onPressed: () {
                 // Navigate back to the login screen

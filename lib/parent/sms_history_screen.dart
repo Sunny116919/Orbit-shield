@@ -11,13 +11,16 @@ class SmsHistoryScreen extends StatelessWidget {
     super.key,
     required this.deviceId,
     required this.deviceName,
-
   });
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('${deviceName} - SMS History')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: Text('${deviceName} - SMS History'),
+        backgroundColor: Colors.white,
+      ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('child_devices')
@@ -44,7 +47,9 @@ class SmsHistoryScreen extends StatelessWidget {
           }
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
-          final entries = List<Map<String, dynamic>>.from(data['entries'] ?? []);
+          final entries = List<Map<String, dynamic>>.from(
+            data['entries'] ?? [],
+          );
           final lastUpdated = (data['updatedAt'] as Timestamp?)?.toDate();
 
           final Map<String, List<Map<String, dynamic>>> conversations = {};
@@ -55,8 +60,12 @@ class SmsHistoryScreen extends StatelessWidget {
 
           final sortedThreads = conversations.entries.toList()
             ..sort((a, b) {
-              final lastMsgA = (a.value.first['date'] as Timestamp?)?.toDate() ?? DateTime(1970);
-              final lastMsgB = (b.value.first['date'] as Timestamp?)?.toDate() ?? DateTime(1970);
+              final lastMsgA =
+                  (a.value.first['date'] as Timestamp?)?.toDate() ??
+                  DateTime(1970);
+              final lastMsgB =
+                  (b.value.first['date'] as Timestamp?)?.toDate() ??
+                  DateTime(1970);
               return lastMsgB.compareTo(lastMsgA);
             });
 
@@ -80,22 +89,35 @@ class SmsHistoryScreen extends StatelessWidget {
                     final lastMessage = messages.first;
 
                     final contactAddress = thread.key;
-                    final contactName = messages.firstWhere(
-                          (m) => m['name'] != null,
-                          orElse: () => {'name': null},
-                        )['name'] as String?;
+                    final contactName =
+                        messages.firstWhere(
+                              (m) => m['name'] != null,
+                              orElse: () => {'name': null},
+                            )['name']
+                            as String?;
 
                     final lastMessageBody = lastMessage['body'] ?? 'No content';
-                    final lastMessageDate = (lastMessage['date'] as Timestamp?)?.toDate();
+                    final lastMessageDate = (lastMessage['date'] as Timestamp?)
+                        ?.toDate();
                     final isSentByChild = lastMessage['kind'] == 'sent';
 
                     return ListTile(
-                      leading: CircleAvatar(child: Text((contactName ?? contactAddress).isNotEmpty ? (contactName ?? contactAddress)[0].toUpperCase() : '#')),
+                      leading: CircleAvatar(
+                        child: Text(
+                          (contactName ?? contactAddress).isNotEmpty
+                              ? (contactName ?? contactAddress)[0].toUpperCase()
+                              : '#',
+                        ),
+                      ),
                       title: Text(contactName ?? contactAddress),
                       subtitle: Row(
                         children: [
                           if (isSentByChild)
-                            const Icon(Icons.done_all, size: 16, color: Colors.blue),
+                            const Icon(
+                              Icons.done_all,
+                              size: 16,
+                              color: Colors.blue,
+                            ),
                           if (isSentByChild) const SizedBox(width: 4),
                           Expanded(
                             child: Text(
@@ -107,7 +129,11 @@ class SmsHistoryScreen extends StatelessWidget {
                         ],
                       ),
                       trailing: lastMessageDate != null
-                          ? Text(DateFormat('dd MMM').format(lastMessageDate.toLocal()))
+                          ? Text(
+                              DateFormat(
+                                'dd MMM',
+                              ).format(lastMessageDate.toLocal()),
+                            )
                           : null,
                       onTap: () {
                         Navigator.push(

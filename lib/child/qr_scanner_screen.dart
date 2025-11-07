@@ -33,11 +33,15 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
         throw Exception("Device ID not found. Please restart the app.");
       }
 
-      await FirebaseFirestore.instance.collection('child_devices').doc(deviceId).set({
-        'parentId': parentId,
-        'linkedAt': FieldValue.serverTimestamp(),
-        'deviceName': '${androidInfo.brand} ${androidInfo.model}', // e.g., "Google Pixel 8"`
-      });
+      await FirebaseFirestore.instance
+          .collection('child_devices')
+          .doc(deviceId)
+          .set({
+            'parentId': parentId,
+            'linkedAt': FieldValue.serverTimestamp(),
+            'deviceName':
+                '${androidInfo.brand} ${androidInfo.model}', // e.g., "Google Pixel 8"`
+          });
 
       await prefs.setBool('isLinked', true);
 
@@ -52,9 +56,9 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
     } catch (e) {
       print("Error linking device: $e");
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
       }
       setState(() {
         _isProcessing = false;
@@ -65,7 +69,11 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Scan QR Code')),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Scan QR Code'),
+        backgroundColor: Colors.white,
+      ),
       body: MobileScanner(
         onDetect: (capture) {
           final List<Barcode> barcodes = capture.barcodes;
