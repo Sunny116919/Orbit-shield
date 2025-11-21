@@ -60,7 +60,6 @@ class _LocationScreenState extends State<LocationScreen>
   }
 }
 
-// --- WIDGET FOR THE 'CURRENT LOCATION' TAB ---
 class _RealTimeLocationView extends StatelessWidget {
   final String deviceId;
   const _RealTimeLocationView({required this.deviceId});
@@ -73,12 +72,10 @@ class _RealTimeLocationView extends StatelessWidget {
       );
       if (placemarks.isNotEmpty) {
         final place = placemarks.first;
-        // You can customize the address format here
         return "${place.street ?? ''}, ${place.locality ?? ''}, ${place.postalCode ?? ''}";
       }
       return "Address not found";
     } catch (e) {
-      // If geocoding fails, return the coordinates instead as a fallback
       return "Lat: ${geoPoint.latitude.toStringAsFixed(4)}, Lng: ${geoPoint.longitude.toStringAsFixed(4)}";
     }
   }
@@ -108,8 +105,8 @@ class _RealTimeLocationView extends StatelessWidget {
 
         final data = snapshot.data!.data() as Map<String, dynamic>?;
         final geoPoint = data?['currentLocation'] as GeoPoint?;
-        final lastUpdated = (data?['locationLastUpdated'] as Timestamp?)
-            ?.toDate();
+        final lastUpdated =
+            (data?['locationLastUpdated'] as Timestamp?)?.toDate();
 
         if (geoPoint == null) {
           return const Center(child: Text('No location data available yet.'));
@@ -225,7 +222,7 @@ class _LocationHistoryView extends StatelessWidget {
           .doc(deviceId)
           .collection('location_history')
           .orderBy('timestamp', descending: true)
-          .limit(50) // Limit to the last 50 data points
+          .limit(50)
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
@@ -243,7 +240,7 @@ class _LocationHistoryView extends StatelessWidget {
               child: ElevatedButton(
                 onPressed: () => _launchMapsDirectionsUrl(
                   historyDocs.reversed.toList(),
-                ), // Reverse to get chronological order for path
+                ),
                 child: const Text('Show Full Path in Google Maps'),
               ),
             ),

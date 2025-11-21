@@ -17,7 +17,7 @@ class ParentApp extends StatelessWidget {
     return const MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Orbit Shield Parent',
-      home: AuthWrapper(), // <-- Show the LoginScreen as the home page
+      home: AuthWrapper(),
     );
   }
 }

@@ -1,16 +1,13 @@
-// [Full file: parent/dashboard_screen.dart]
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'device_detail_screen.dart'; // Ensure these imports are correct
-import 'sos_alert_screen.dart'; // for your project structure
+import 'device_detail_screen.dart';
+import 'sos_alert_screen.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
-  // Function to show the QR code dialog (unchanged)
   void _showQrCodeDialog(BuildContext context, User? user) {
     if (user == null) return;
     showDialog(
@@ -65,12 +62,11 @@ class DashboardScreen extends StatelessWidget {
             .where('parentId', isEqualTo: user?.uid)
             .snapshots(),
         builder: (context, snapshot) {
-          // --- Loading, Error, No Devices states (unchanged) ---
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            print('Error fetching devices: ${snapshot.error}'); // Add logging
+            print('Error fetching devices: ${snapshot.error}');
             return const Center(child: Text('Something went wrong.'));
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
@@ -81,11 +77,8 @@ class DashboardScreen extends StatelessWidget {
               ),
             );
           }
-          // --- End of states ---
 
           final devices = snapshot.data!.docs;
-
-          // --- SOS and Normal device separation (unchanged) ---
           final sosDevices = devices.where((doc) {
             final data = doc.data() as Map<String, dynamic>;
             return data.containsKey('sos_trigger') &&
@@ -96,11 +89,9 @@ class DashboardScreen extends StatelessWidget {
             return !data.containsKey('sos_trigger') ||
                 data['sos_trigger'] == false;
           }).toList();
-          // --- End of separation ---
 
           return Column(
             children: [
-              // --- SOS Banner list (unchanged) ---
               if (sosDevices.isNotEmpty)
                 ListView.builder(
                   shrinkWrap: true,
@@ -114,7 +105,6 @@ class DashboardScreen extends StatelessWidget {
                     );
                   },
                 ),
-              // --- Normal Device list (unchanged structure) ---
               Expanded(
                 child: RefreshIndicator(
                   onRefresh: () async =>
@@ -123,18 +113,16 @@ class DashboardScreen extends StatelessWidget {
                     itemCount: normalDevices.length,
                     itemBuilder: (context, index) {
                       final deviceDoc = normalDevices[index];
-                      // Ensure data is correctly cast
                       final deviceDataMap =
                           deviceDoc.data() as Map<String, dynamic>?;
                       if (deviceDataMap == null) {
-                        // Handle cases where data might be unexpectedly null
                         return ListTile(
                           title: Text('Error loading data for ${deviceDoc.id}'),
                         );
                       }
                       return _DeviceListItem(
                         deviceId: deviceDoc.id,
-                        deviceData: deviceDataMap, // Pass the verified map
+                        deviceData: deviceDataMap,
                       );
                     },
                   ),
@@ -148,7 +136,6 @@ class DashboardScreen extends StatelessWidget {
   }
 }
 
-// --- _SosAlertBanner Widget (unchanged) ---
 class _SosAlertBanner extends StatelessWidget {
   final String deviceId;
   final Map<String, dynamic> deviceData;
@@ -191,15 +178,12 @@ class _SosAlertBanner extends StatelessWidget {
     );
   }
 }
-// --- End of _SosAlertBanner ---
 
-// --- Widget for Each Device Item in the List ---
 class _DeviceListItem extends StatelessWidget {
   final String deviceId;
   final Map<String, dynamic> deviceData;
   const _DeviceListItem({required this.deviceId, required this.deviceData});
 
-  // --- Icon Helpers (unchanged) ---
   IconData getRingerIcon(String? ringerMode) {
     switch (ringerMode) {
       case 'normal':
@@ -223,12 +207,9 @@ class _DeviceListItem extends StatelessWidget {
         return Icons.signal_wifi_off_outlined;
     }
   }
-  // --- End of Icon Helpers ---
 
-  // --- Delete Confirmation Dialog (unchanged) ---
   void _showDeleteConfirmation(BuildContext context) {
     showDialog(
-      /* ... unchanged ... */
       context: context,
       builder: (BuildContext ctx) {
         return AlertDialog(
@@ -259,7 +240,6 @@ class _DeviceListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // --- Extract data (existing fields) ---
     final deviceName = deviceData['deviceName'] ?? 'Unknown';
     final batteryLevel = deviceData['batteryLevel'];
     final lastUpdated = deviceData['lastUpdated'] as Timestamp?;
@@ -271,7 +251,6 @@ class _DeviceListItem extends StatelessWidget {
         lastUpdated != null &&
         DateTime.now().difference(lastUpdated.toDate()).inMinutes < 30;
 
-    // --- Build ListTile ---
     return ListTile(
       leading: Icon(
         Icons.phone_android,
@@ -282,14 +261,12 @@ class _DeviceListItem extends StatelessWidget {
         deviceName,
         style: const TextStyle(fontWeight: FontWeight.bold),
       ),
-      // vvv ---- THIS SUBTITLE IS MODIFIED ---- vvv
       subtitle: !isOnline
           ? const Text('Offline', style: TextStyle(color: Colors.grey))
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  // Row for icons
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Icon(
@@ -305,7 +282,6 @@ class _DeviceListItem extends StatelessWidget {
                     ),
                   ],
                 ),
-                // Network Name (from previous step)
                 if (internetStatus == 'WiFi' &&
                     wifiSsid != null &&
                     wifiSsid.isNotEmpty) ...[
@@ -325,7 +301,6 @@ class _DeviceListItem extends StatelessWidget {
               ],
             ),
       trailing: Row(
-        // Trailing section (unchanged)
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
@@ -341,7 +316,6 @@ class _DeviceListItem extends StatelessWidget {
         ],
       ),
       onTap: () {
-        // Navigation (unchanged)
         Navigator.push(
           context,
           MaterialPageRoute(

@@ -19,14 +19,13 @@ class InstalledAppsScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text('${deviceName} - Installed Apps'),
         backgroundColor: Colors.white,
-        // No refresh button here, handled by DeviceDetailScreen
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('child_devices')
             .doc(deviceId)
-            .collection('installed_apps') // New subcollection
-            .doc('list') // New document name
+            .collection('installed_apps')
+            .doc('list')
             .snapshots(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -48,7 +47,6 @@ class InstalledAppsScreen extends StatelessWidget {
 
           final data = snapshot.data!.data() as Map<String, dynamic>;
           final apps = List<Map<String, dynamic>>.from(data['apps'] ?? []);
-          // Sort alphabetically by app name, ignoring case
           apps.sort(
             (a, b) => (a['appName'] ?? '').toLowerCase().compareTo(
               (b['appName'] ?? '').toLowerCase(),
@@ -73,7 +71,6 @@ class InstalledAppsScreen extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final app = apps[index];
                     return ListTile(
-                      // Placeholder icon, as we don't store the actual icon
                       leading: const Icon(Icons.android, color: Colors.grey),
                       title: Text(app['appName'] ?? 'Unknown App'),
                       subtitle: Text(

@@ -1,14 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:orbit_shield/parent/app_blocker_screen.dart';
 import 'dart:async';
 import 'package:orbit_shield/parent/app_usage_screens.dart';
 import 'package:orbit_shield/parent/clipboard_screen.dart';
+import 'package:orbit_shield/parent/findmydevice_screen.dart';
 import 'package:orbit_shield/parent/installed_app_screen.dart';
 import 'package:orbit_shield/parent/location_screen.dart';
 import 'package:orbit_shield/parent/sos_alert_history_screen.dart';
+import 'package:orbit_shield/parent/volume_control_screen.dart';
 import 'call_history_screen.dart';
 import 'sms_history_screen.dart';
 import 'contacts_screen.dart';
+import 'notification_history_screen.dart'; // <-- ADDED IMPORT
 
 class DeviceDetailScreen extends StatefulWidget {
   final String deviceId;
@@ -27,28 +31,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
   @override
   void initState() {
     super.initState();
-    _triggerInitialFetchIfNeeded();
-  }
-
-  Future<void> _triggerInitialFetchIfNeeded() async {
-    final docRef = FirebaseFirestore.instance
-        .collection('child_devices')
-        .doc(widget.deviceId);
-    final doc = await docRef.get();
-    if (!doc.exists) return;
-    final data = doc.data() as Map<String, dynamic>;
-    if (!data.containsKey('initialFetchComplete') ||
-        data['initialFetchComplete'] == false) {
-      print('--- First time opening details. Triggering ALL data fetches. ---');
-      await docRef.update({
-        'requestAppUsage': true,
-        // 'requestScreenTimeReport': true, // <-- REMOVED
-        'requestCallLog': true,
-        'requestSmsLog': true,
-        'requestContacts': true,
-        'requestInstalledApps': true,
-      });
-    }
+    // _triggerInitialFetchIfNeeded();
   }
 
   Future<void> _requestData(String requestFlag) async {
@@ -58,7 +41,6 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           .doc(widget.deviceId)
           .update({requestFlag: true});
     } catch (e) {
-      print("Failed to send request for $requestFlag: $e");
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -86,50 +68,43 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           }
           final data = snapshot.data!.data() as Map<String, dynamic>? ?? {};
 
-          // --- Separate Flags ---
           final bool isFetchingAppUsage = data['requestAppUsage'] ?? false;
-          // final bool isFetchingScreenTimeReport = ... // <-- REMOVED
-          // ---
-
           final bool isFetchingCallLog = data['requestCallLog'] ?? false;
           final bool isFetchingSmsLog = data['requestSmsLog'] ?? false;
           final bool isFetchingContacts = data['requestContacts'] ?? false;
           final bool isFetchingInstalledApps =
               data['requestInstalledApps'] ?? false;
-          final bool initialFetchWasDone =
-              data['initialFetchComplete'] ?? false;
           final bool isFetchingClipboard = data['requestClipboard'] ?? false;
-
-          if (!initialFetchWasDone &&
-              !isFetchingAppUsage &&
-              // !isFetchingScreenTimeReport && // <-- REMOVED
-              !isFetchingCallLog &&
-              !isFetchingSmsLog &&
-              !isFetchingContacts &&
-              !isFetchingInstalledApps) {
-            try {
-              FirebaseFirestore.instance
-                  .collection('child_devices')
-                  .doc(widget.deviceId)
-                  .update({'initialFetchComplete': true});
-            } catch (e) {
-              print("Error marking initial fetch complete: $e");
-            }
-          }
+          // vvv NEW: Tracking Notification Fetch (Optional, if you add a trigger) vvv
+          final bool isFetchingNotifications = data['requestNotificationHistory'] ?? false; 
+          
+          final bool isRinging = data['requestForceRing'] ?? false;
+          final bool isFinding = data['requestFindDevice'] ?? false;
 
           return ListView(
             children: [
-              // --- TILE 1: Screen Time Report ---
-              // <-- REMOVED
-
-              // --- TILE 2: App Usage Stats ---
+              _FeatureTile(
+                title: 'Installed Apps',
+                subtitle: 'View all installed applications',
+                icon: Icons.apps,
+                isLoading: isFetchingInstalledApps,
+                onRefresh: () => _requestData('requestInstalledApps'),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => InstalledAppsScreen(
+                      deviceId: widget.deviceId,
+                      deviceName: widget.deviceName,
+                    ),
+                  ),
+                ),
+              ),
               _FeatureTile(
                 title: 'App Usage Stats',
                 subtitle: 'View usage by app: Today, 24h, 30d',
                 icon: Icons.bar_chart,
-                isLoading: isFetchingAppUsage, // <-- Uses its own flag
-                onRefresh: () =>
-                    _requestData('requestAppUsage'), // <-- Uses its own flag
+                isLoading: isFetchingAppUsage,
+                onRefresh: () => _requestData('requestAppUsage'),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -140,7 +115,45 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                   ),
                 ),
               ),
-              // --- Other Tiles ---
+              
+              _FeatureTile(
+                title: 'App Blocker',
+                subtitle: 'Block or unblock applications',
+                icon: Icons.block,
+                isLoading: isFetchingInstalledApps,
+                onRefresh: () {
+                  _requestData('requestInstalledApps');
+                },
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => AppBlockerScreen(
+                      deviceId: widget.deviceId,
+                      deviceName: widget.deviceName,
+                    ),
+                  ),
+                ),
+              ),
+
+              // --- vvv ADDED: Notification History Tile vvv ---
+              _FeatureTile(
+                title: 'Notification History',
+                subtitle: 'View past notifications from apps',
+                icon: Icons.notifications_active_outlined,
+                isLoading: isFetchingNotifications,
+                onRefresh: () => _requestData('requestNotificationHistory'), // Trigger logic if added
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => NotificationHistoryScreen(
+                      deviceId: widget.deviceId,
+                      deviceName: widget.deviceName,
+                    ),
+                  ),
+                ),
+              ),
+              // --- ^^^ END ADDED ^^^ ---
+
               _FeatureTile(
                 title: 'Call History',
                 subtitle: 'View incoming and outgoing calls',
@@ -190,15 +203,15 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                 ),
               ),
               _FeatureTile(
-                title: 'Installed Apps',
-                subtitle: 'View all installed applications',
-                icon: Icons.apps,
-                isLoading: isFetchingInstalledApps,
-                onRefresh: () => _requestData('requestInstalledApps'),
+                title: 'View Clipboard',
+                subtitle: 'See the most recent copied text',
+                icon: Icons.content_paste,
+                isLoading: isFetchingClipboard,
+                onRefresh: () => _requestData('requestClipboard'),
                 onTap: () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => InstalledAppsScreen(
+                    builder: (context) => ClipboardScreen(
                       deviceId: widget.deviceId,
                       deviceName: widget.deviceName,
                     ),
@@ -207,45 +220,38 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
               ),
               const Divider(),
               ListTile(
-                title: const Text('SOS Alert History'),
-                subtitle: const Text('View a log of all panic alerts'),
-                leading: const Icon(Icons.warning_amber_rounded),
-                trailing: const Icon(Icons.chevron_right),
-                // onRefresh: () {
-                //   // This is a log, so a manual refresh doesn't do much.
-                //   ScaffoldMessenger.of(context).showSnackBar(
-                //     const SnackBar(
-                //       content: Text('SOS history is updated automatically.'),
-                //     ),
-                //   );
-                // },
-                onTap: () => Navigator.push(
+                title: const Text('Find My Device'),
+                subtitle: const Text('Ring the child\'s phone remotely'),
+                leading: const Icon(Icons.spatial_audio_rounded),
+                trailing: isFinding
+                    ? SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon(Icons.chevron_right),
+                onTap: isFinding ? null : () => Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => SosAlertHistoryScreen(
+                    builder: (context) => FindMyDeviceScreen(
                       deviceId: widget.deviceId,
                       deviceName: widget.deviceName,
                     ),
                   ),
                 ),
               ),
-              // const Divider(),
-              // _FeatureTile(
-              //   title: 'View Clipboard',
-              //   subtitle: 'See the most recent copied text',
-              //   icon: Icons.content_paste,
-              //   isLoading: isFetchingClipboard,
-              //   onRefresh: () => _requestData('requestClipboard'),
-              //   onTap: () => Navigator.push(
-              //     context,
-              //     MaterialPageRoute(
-              //       builder: (context) => ClipboardScreen(
-              //         deviceId: widget.deviceId,
-              //         deviceName: widget.deviceName,
-              //       ),
-              //     ),
-              //   ),
-              // ),
+              const Divider(),
+              ListTile(
+                title: const Text('Volume Control'),
+                subtitle: const Text("Manage Ringer, Alarm, and System sounds"),
+                leading: const Icon(Icons.tune_rounded),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => VolumeControlScreen(
+                      deviceId: widget.deviceId,
+                      deviceName: widget.deviceName,
+                    ),
+                  ),
+                ),
+              ),
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.location_on),
@@ -265,6 +271,22 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                 },
               ),
               const Divider(),
+              ListTile(
+                title: const Text('SOS Alert History'),
+                subtitle: const Text('View a log of all panic alerts'),
+                leading: const Icon(Icons.warning_amber_rounded),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SosAlertHistoryScreen(
+                      deviceId: widget.deviceId,
+                      deviceName: widget.deviceName,
+                    ),
+                  ),
+                ),
+              ),
+              const Divider(),
             ],
           );
         },
@@ -277,6 +299,7 @@ class _FeatureTile extends StatefulWidget {
   final String title;
   final String subtitle;
   final IconData icon;
+
   final bool isLoading;
   final VoidCallback onTap;
   final VoidCallback onRefresh;

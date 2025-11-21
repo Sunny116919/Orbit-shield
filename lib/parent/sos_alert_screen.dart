@@ -42,7 +42,18 @@ class SosAlertScreen extends StatelessWidget {
   void _cancelSosAlert() {
     FirebaseFirestore.instance.collection('child_devices').doc(deviceId).update(
       {'sos_trigger': false},
-    ); // Update the correct field
+    );
+  }
+
+  void _requestForceRing() {
+    try {
+      FirebaseFirestore.instance
+          .collection('child_devices')
+          .doc(deviceId)
+          .update({'requestForceRing': true});
+    } catch (e) {
+      print("Failed to send Force Ring request: $e");
+    }
   }
 
   @override
@@ -64,11 +75,11 @@ class SosAlertScreen extends StatelessWidget {
           }
           final data = snapshot.data!.data() as Map<String, dynamic>;
 
-          // --- MODIFIED: Use the standard location fields ---
           final isSosActive = data['sos_trigger'] == true;
           final geoPoint = data['currentLocation'] as GeoPoint?;
-          final timestamp = (data['locationLastUpdated'] as Timestamp?)
-              ?.toDate();
+          final timestamp =
+              (data['locationLastUpdated'] as Timestamp?)?.toDate();
+          final bool isRinging = data['requestForceRing'] ?? false;
 
           if (!isSosActive) {
             return Center(
@@ -115,8 +126,8 @@ class SosAlertScreen extends StatelessWidget {
                   deviceName.toUpperCase(),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
                 const SizedBox(height: 20),
                 Card(
@@ -164,6 +175,23 @@ class SosAlertScreen extends StatelessWidget {
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: const TextStyle(fontSize: 16),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed: isRinging ? null : _requestForceRing,
+                  icon: Icon(
+                    isRinging
+                        ? Icons.volume_up_rounded
+                        : Icons.volume_off_rounded,
+                  ),
+                  label: Text(isRinging ? 'RINGING...' : 'FORCE RING PHONE'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isRinging ? Colors.grey : Colors.orange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    textStyle: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
                 const SizedBox(height: 16),

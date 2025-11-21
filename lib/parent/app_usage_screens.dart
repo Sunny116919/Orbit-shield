@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 class AppUsageScreen extends StatefulWidget {
-  // Changed to StatefulWidget
   final String deviceId;
   final String deviceName;
 
@@ -19,7 +18,6 @@ class AppUsageScreen extends StatefulWidget {
 
 class _AppUsageScreenState extends State<AppUsageScreen>
     with SingleTickerProviderStateMixin {
-  // Added TickerProvider
   late TabController _tabController;
 
   @override
@@ -28,16 +26,15 @@ class _AppUsageScreenState extends State<AppUsageScreen>
     _tabController = TabController(
       length: 3,
       vsync: this,
-    ); // Initialize TabController
+    );
   }
 
   @override
   void dispose() {
-    _tabController.dispose(); // Dispose TabController
+    _tabController.dispose();
     super.dispose();
   }
 
-  // --- ADDED HELPER FUNCTION ---
   String _formatDuration(Duration duration) {
     if (duration.inMinutes == 0) return '0m';
     final hours = duration.inHours;
@@ -52,14 +49,13 @@ class _AppUsageScreenState extends State<AppUsageScreen>
     return result.trim();
   }
 
-  // Helper Widget to build the list view for each tab
   Widget _buildUsageList(String firestoreDocName, String titlePrefix) {
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection('child_devices')
           .doc(widget.deviceId)
           .collection('app_usage')
-          .doc(firestoreDocName) // Use the passed document name
+          .doc(firestoreDocName)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
@@ -82,15 +78,12 @@ class _AppUsageScreenState extends State<AppUsageScreen>
         final data = snapshot.data!.data() as Map<String, dynamic>;
         final apps = List<Map<String, dynamic>>.from(data['apps'] ?? []);
 
-        // --- ADDED TOTAL CALCULATION ---
         int totalMinutes = 0;
         for (var app in apps) {
           totalMinutes += (app['totalUsageMinutes'] as num? ?? 0).toInt();
         }
         final totalDuration = Duration(minutes: totalMinutes);
-        // Only show total for Today and 24h, not 30d
         final bool showTotal = firestoreDocName != 'last_30d_stats';
-        // --- END TOTAL CALCULATION ---
 
         apps.sort(
           (a, b) => (b['totalUsageMinutes'] ?? 0).compareTo(
@@ -100,12 +93,11 @@ class _AppUsageScreenState extends State<AppUsageScreen>
         final lastUpdated = (data['updatedAt'] as Timestamp?)?.toDate();
         final startDateString = data['startDate'] as String?;
         final endDateString = data['endDate'] as String?;
-        String dateRange = titlePrefix; // Default title
+        String dateRange = titlePrefix;
         if (startDateString != null && endDateString != null) {
           final start = DateTime.tryParse(startDateString)?.toLocal();
           final end = DateTime.tryParse(endDateString)?.toLocal();
           if (start != null && end != null) {
-            // Be more specific for Today/24h
             if (firestoreDocName == 'today_stats') {
               dateRange = "Today (${DateFormat.yMd().format(start)})";
             } else if (firestoreDocName == 'last_24h_stats') {
@@ -129,8 +121,6 @@ class _AppUsageScreenState extends State<AppUsageScreen>
                 style: Theme.of(context).textTheme.titleMedium,
               ),
             ),
-
-            // --- ADDED TOTALS WIDGET ---
             if (showTotal)
               Padding(
                 padding: const EdgeInsets.symmetric(
@@ -146,15 +136,15 @@ class _AppUsageScreenState extends State<AppUsageScreen>
                     const SizedBox(height: 4),
                     Text(
                       _formatDuration(totalDuration),
-                      style: Theme.of(context).textTheme.headlineSmall
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
                           ?.copyWith(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                   ],
                 ),
               ),
-
-            // --- END ADDED WIDGET ---
             if (lastUpdated != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 8.0),
@@ -195,7 +185,7 @@ class _AppUsageScreenState extends State<AppUsageScreen>
                             app['appName'] ??
                                 app['packageName'] ??
                                 'Unknown App',
-                          ), // Fallback to package name
+                          ),
                           trailing: Text(
                             usageString,
                             style: const TextStyle(
@@ -221,7 +211,6 @@ class _AppUsageScreenState extends State<AppUsageScreen>
         title: Text('${widget.deviceName} - App Usage'),
         backgroundColor: Colors.white,
         bottom: TabBar(
-          // Add TabBar here
           controller: _tabController,
           tabs: const [
             Tab(text: 'Today'),
@@ -231,12 +220,11 @@ class _AppUsageScreenState extends State<AppUsageScreen>
         ),
       ),
       body: TabBarView(
-        // Use TabBarView for the body
         controller: _tabController,
         children: [
-          _buildUsageList('today_stats', "Today"), // Tab 1 content
-          _buildUsageList('last_24h_stats', "Last 24h"), // Tab 2 content
-          _buildUsageList('last_30d_stats', "Last 30d"), // Tab 3 content
+          _buildUsageList('today_stats', "Today"),
+          _buildUsageList('last_24h_stats', "Last 24h"),
+          _buildUsageList('last_30d_stats', "Last 30d"),
         ],
       ),
     );

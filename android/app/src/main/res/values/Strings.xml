@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">This service is required to monitor web browsing and block apps to ensure your child\'s safety.</string>
+</resources>

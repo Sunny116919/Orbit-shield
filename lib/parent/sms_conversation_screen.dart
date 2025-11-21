@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart'; // <-- Add this import
+import 'package:intl/intl.dart';
 
 class SmsConversationScreen extends StatelessWidget {
   final String? contactName;
@@ -14,7 +14,6 @@ class SmsConversationScreen extends StatelessWidget {
     required this.messages,
   });
 
-  // Helper function to check if two dates are on the same day
   bool _isSameDay(DateTime dateA, DateTime dateB) {
     return dateA.year == dateB.year &&
         dateA.month == dateB.month &&
@@ -23,27 +22,24 @@ class SmsConversationScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Sort messages by date to ensure they are in chronological order
     messages.sort((a, b) {
       final dateA = (a['date'] as Timestamp?)?.toDate() ?? DateTime(1970);
       final dateB = (b['date'] as Timestamp?)?.toDate() ?? DateTime(1970);
       return dateA.compareTo(dateB);
     });
 
-    // vvv NEW: LOGIC TO CREATE A LIST WITH DATE SEPARATORS vvv
     final List<dynamic> items = [];
     DateTime? lastDate;
     for (var message in messages) {
       final currentDate = (message['date'] as Timestamp?)?.toDate();
       if (currentDate != null) {
-        if (lastDate == null || !_isSameDay(lastDate!, currentDate)) {
-          items.add(currentDate); // Add a date separator
+        if (lastDate == null || !_isSameDay(lastDate, currentDate)) {
+          items.add(currentDate);
           lastDate = currentDate;
         }
       }
-      items.add(message); // Add the message itself
+      items.add(message);
     }
-    // ^^^ END OF NEW LOGIC ^^^
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -70,20 +66,17 @@ class SmsConversationScreen extends StatelessWidget {
         itemBuilder: (context, index) {
           final item = items[index];
 
-          // --- If the item is a date, build a date separator chip ---
           if (item is DateTime) {
             return Center(
               child: Chip(label: Text(DateFormat.yMMMMd().format(item))),
             );
           }
 
-          // --- Otherwise, build the message bubble ---
           final message = item as Map<String, dynamic>;
           final body = message['body'] ?? 'No content';
           final isSent = message['kind'] == 'sent';
           final date = (message['date'] as Timestamp?)?.toDate();
 
-          // vvv NEW: CHAT BUBBLE WRAPPED IN A COLUMN FOR TIMESTAMP vvv
           return Align(
             alignment: isSent ? Alignment.centerRight : Alignment.centerLeft,
             child: Column(
@@ -110,14 +103,13 @@ class SmsConversationScreen extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16.0),
                     child: Text(
-                      DateFormat.jm().format(date.toLocal()), // e.g., 5:40 PM
+                      DateFormat.jm().format(date.toLocal()),
                       style: const TextStyle(fontSize: 12, color: Colors.grey),
                     ),
                   ),
               ],
             ),
           );
-          // ^^^ END OF UPDATE ^^^
         },
       ),
     );

@@ -24,7 +24,6 @@ class _LoginScreenState extends State<LoginScreen> {
         password,
       );
       if (user != null && mounted) {
-        // We'll navigate to the dashboard from here later
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Login successful for ${user.email}')),
         );
@@ -75,10 +74,12 @@ class _LoginScreenState extends State<LoginScreen> {
               obscureText: true,
             ),
             const SizedBox(height: 24.0),
-            ElevatedButton(onPressed: _login, child: const Text('Login'),),
+            ElevatedButton(
+              onPressed: _login,
+              child: const Text('Login'),
+            ),
             TextButton(
               onPressed: () {
-                // Navigate to the SignUpScreen
                 Navigator.of(context).push(
                   MaterialPageRoute(builder: (context) => const SignUpScreen()),
                 );

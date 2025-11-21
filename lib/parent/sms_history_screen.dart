@@ -62,10 +62,10 @@ class SmsHistoryScreen extends StatelessWidget {
             ..sort((a, b) {
               final lastMsgA =
                   (a.value.first['date'] as Timestamp?)?.toDate() ??
-                  DateTime(1970);
+                      DateTime(1970);
               final lastMsgB =
                   (b.value.first['date'] as Timestamp?)?.toDate() ??
-                  DateTime(1970);
+                      DateTime(1970);
               return lastMsgB.compareTo(lastMsgA);
             });
 
@@ -97,8 +97,8 @@ class SmsHistoryScreen extends StatelessWidget {
                             as String?;
 
                     final lastMessageBody = lastMessage['body'] ?? 'No content';
-                    final lastMessageDate = (lastMessage['date'] as Timestamp?)
-                        ?.toDate();
+                    final lastMessageDate =
+                        (lastMessage['date'] as Timestamp?)?.toDate();
                     final isSentByChild = lastMessage['kind'] == 'sent';
 
                     return ListTile(
@@ -130,9 +130,8 @@ class SmsHistoryScreen extends StatelessWidget {
                       ),
                       trailing: lastMessageDate != null
                           ? Text(
-                              DateFormat(
-                                'dd MMM',
-                              ).format(lastMessageDate.toLocal()),
+                              DateFormat('dd MMM')
+                                  .format(lastMessageDate.toLocal()),
                             )
                           : null,
                       onTap: () {

@@ -39,8 +39,7 @@ class _QrScannerScreenState extends State<QrScannerScreen> {
           .set({
             'parentId': parentId,
             'linkedAt': FieldValue.serverTimestamp(),
-            'deviceName':
-                '${androidInfo.brand} ${androidInfo.model}', // e.g., "Google Pixel 8"`
+            'deviceName': '${androidInfo.brand} ${androidInfo.model}',
           });
 
       await prefs.setBool('isLinked', true);

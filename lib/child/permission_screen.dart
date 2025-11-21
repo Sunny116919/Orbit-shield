@@ -1,9 +1,13 @@
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // For MethodChannel
 import 'package:permission_handler/permission_handler.dart';
 import 'package:app_usage/app_usage.dart';
 import 'package:geolocator/geolocator.dart';
 import 'qr_scanner_screen.dart';
 import 'package:disable_battery_optimization/disable_battery_optimization.dart';
+import 'package:sound_mode/permission_handler.dart' as DndPermission;
+import 'dart:io' show Platform;
 
 class PermissionScreen extends StatefulWidget {
   const PermissionScreen({super.key});
@@ -22,7 +26,13 @@ class _PermissionScreenState extends State<PermissionScreen>
   bool _isBackgroundLocationGranted = false;
   bool _isGpsEnabled = false;
   bool _isBatteryOptimizationDisabled = false;
-  // bool _isNotificationAccessGranted = false; // Removed
+  bool _isDndAccessGranted = false;
+  // vvv ADDED: Track Notification Listener Permission vvv
+  bool _isNotificationListenerGranted = false; 
+  
+  // Define the channel to talk to MainActivity.kt
+  static const MethodChannel _notificationChannel = 
+      MethodChannel('com.orbitshield.app/notifications');
 
   @override
   void initState() {
@@ -54,7 +64,19 @@ class _PermissionScreenState extends State<PermissionScreen>
     final isGpsEnabled = await Geolocator.isLocationServiceEnabled();
     final isBatteryOptDisabled =
         await DisableBatteryOptimization.isBatteryOptimizationDisabled;
-    // final isNotificationGranted = ... // Removed
+    
+    final isDndGranted = await DndPermission.PermissionHandler.permissionsGranted;
+
+    // vvv ADDED: Check Notification Listener Status vvv
+    bool isNotifListenerGranted = false;
+    if (Platform.isAndroid) {
+      try {
+        isNotifListenerGranted = await _notificationChannel.invokeMethod('isPermissionGranted');
+      } catch (e) {
+        print("Error checking notification permission: $e");
+      }
+    }
+    // ^^^ END ADDED ^^^
 
     setState(() {
       _isCameraGranted = cameraStatus.isGranted;
@@ -65,7 +87,8 @@ class _PermissionScreenState extends State<PermissionScreen>
       _isBackgroundLocationGranted = backgroundLocationStatus.isGranted;
       _isGpsEnabled = isGpsEnabled;
       _isBatteryOptimizationDisabled = isBatteryOptDisabled ?? false;
-      // _isNotificationAccessGranted = isNotificationGranted ?? false; // Removed
+      _isDndAccessGranted = isDndGranted!;
+      _isNotificationListenerGranted = isNotifListenerGranted; // Update state
     });
   }
 
@@ -118,10 +141,36 @@ class _PermissionScreenState extends State<PermissionScreen>
     await DisableBatteryOptimization.showDisableBatteryOptimizationSettings();
   }
 
-  // Future<void> _requestNotificationAccess() async { ... } // Removed
+  Future<void> _requestDndAccess() async {
+    await DndPermission.PermissionHandler.openDoNotDisturbSetting();
+  }
+
+  Future<void> _openAccessibilitySettings() async {
+    if (Platform.isAndroid) {
+      const AndroidIntent intent = AndroidIntent(
+        action: 'android.settings.ACCESSIBILITY_SETTINGS',
+      );
+      await intent.launch();
+    }
+  }
+
+  // vvv ADDED: Request Notification Listener Permission vvv
+  Future<void> _requestNotificationListenerPermission() async {
+    if (Platform.isAndroid) {
+      try {
+        await _notificationChannel.invokeMethod('requestPermission');
+      } catch (e) {
+        print("Error requesting notification permission: $e");
+      }
+    }
+  }
+  // ^^^ END ADDED ^^^
 
   @override
   Widget build(BuildContext context) {
+    // We cannot check Accessibility easily (without complex native code), 
+    // so we don't include it in 'canContinue'.
+    // However, we CAN check Notification Listener now!
     final bool canContinue =
         _isCameraGranted &&
         _isCallLogGranted &&
@@ -130,8 +179,9 @@ class _PermissionScreenState extends State<PermissionScreen>
         _isLocationGranted &&
         _isGpsEnabled &&
         _isBackgroundLocationGranted &&
-        _isBatteryOptimizationDisabled;
-    // _isNotificationAccessGranted; // Removed
+        _isBatteryOptimizationDisabled &&
+        _isDndAccessGranted &&
+        _isNotificationListenerGranted; // Added check
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -312,6 +362,63 @@ class _PermissionScreenState extends State<PermissionScreen>
                     ListTile(
                       contentPadding: EdgeInsets.zero,
                       title: const Text(
+                        'Do Not Disturb Access',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle:
+                          const Text('Needed to force ring on silent mode.'),
+                      trailing: _isDndAccessGranted
+                          ? const Icon(
+                              Icons.check_circle,
+                              color: Colors.green,
+                              size: 30,
+                            )
+                          : ElevatedButton(
+                              onPressed: _requestDndAccess,
+                              child: const Text('Settings'),
+                            ),
+                    ),
+
+                    // --- vvv ADDED: Notification Access Tile vvv ---
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                        'Notification Access',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: const Text(
+                        'Needed to read notification history.',
+                      ),
+                      trailing: _isNotificationListenerGranted
+                          ? const Icon(
+                              Icons.check_circle,
+                              color: Colors.green,
+                              size: 30,
+                            )
+                          : ElevatedButton(
+                              onPressed: _requestNotificationListenerPermission,
+                              child: const Text('Settings'),
+                            ),
+                    ),
+                    // --- ^^^ END ADDED ^^^ ---
+
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
+                        'Accessibility Service',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      subtitle: const Text(
+                        'Needed for App Blocker. Find "Orbit Shield" in the list and enable it.',
+                      ),
+                      trailing: ElevatedButton(
+                        onPressed: _openAccessibilitySettings,
+                        child: const Text('Settings'),
+                      ),
+                    ),
+                    ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text(
                         'Disable Battery Optimization',
                         style: TextStyle(fontWeight: FontWeight.bold),
                       ),
@@ -329,7 +436,6 @@ class _PermissionScreenState extends State<PermissionScreen>
                               child: const Text('Settings'),
                             ),
                     ),
-                    // --- Notification Tile Removed ---
                   ],
                 ),
               ),

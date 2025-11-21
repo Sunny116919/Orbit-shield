@@ -12,7 +12,6 @@ class CallHistoryScreen extends StatelessWidget {
     required this.deviceName,
   });
 
-  // Helper function to get an icon for each call type
   IconData _getCallTypeIcon(String? callType) {
     switch (callType) {
       case 'incoming':
@@ -28,7 +27,6 @@ class CallHistoryScreen extends StatelessWidget {
     }
   }
 
-  // Helper function to format the call duration
   String _formatDuration(int? seconds) {
     if (seconds == null || seconds == 0) return '';
     final duration = Duration(seconds: seconds);
@@ -101,8 +99,8 @@ class CallHistoryScreen extends StatelessWidget {
                     final name = entry['name'] ?? 'Unknown';
                     final number = entry['number'] ?? 'No number';
                     final callType = entry['callType'] as String?;
-                    final timestamp = (entry['timestamp'] as Timestamp?)
-                        ?.toDate();
+                    final timestamp =
+                        (entry['timestamp'] as Timestamp?)?.toDate();
                     final duration = _formatDuration(entry['duration']);
 
                     return ListTile(
@@ -111,8 +109,8 @@ class CallHistoryScreen extends StatelessWidget {
                         color: callType == 'missed'
                             ? Colors.red
                             : (callType == 'incoming'
-                                  ? Colors.green
-                                  : Colors.blue),
+                                ? Colors.green
+                                : Colors.blue),
                       ),
                       title: Text(name),
                       subtitle: Text(number),
@@ -122,16 +120,15 @@ class CallHistoryScreen extends StatelessWidget {
                         children: [
                           if (timestamp != null)
                             Text(
-                              DateFormat.yMd().add_jm().format(
-                                timestamp.toLocal(),
-                              ),
+                              DateFormat.yMd()
+                                  .add_jm()
+                                  .format(timestamp.toLocal()),
                             ),
                           if (duration.isNotEmpty)
                             Text(
                               duration,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                              ),
+                              style:
+                                  const TextStyle(fontWeight: FontWeight.bold),
                             ),
                         ],
                       ),

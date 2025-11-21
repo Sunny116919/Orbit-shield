@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../services/auth_service.dart'; // Make sure this path is correct
+import '../../services/auth_service.dart';
 
 class SignUpScreen extends StatefulWidget {
   const SignUpScreen({super.key});
@@ -23,12 +23,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
         password,
       );
       if (user != null && mounted) {
-        // If sign up is successful, you might want to pop back to the login screen
-        // or navigate to the dashboard. For now, we'll show a success message.
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Sign up successful for ${user.email}')),
         );
-        // Pop back to the login screen after a short delay
         Future.delayed(const Duration(seconds: 1), () {
           if (mounted) {
             Navigator.of(context).pop();
@@ -84,7 +81,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ElevatedButton(onPressed: _signUp, child: const Text('Sign Up')),
             TextButton(
               onPressed: () {
-                // Navigate back to the login screen
                 Navigator.of(context).pop();
               },
               child: const Text('Already have an account? Login'),
