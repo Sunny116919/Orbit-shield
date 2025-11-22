@@ -73,6 +73,7 @@ dependencies:
   volume_controller: ^3.4.0
   flutter_ringtone_player: ^4.0.0+4
   android_intent_plus: ^6.0.0
+  flutter_dotenv: ^6.0.0
 
 dev_dependencies:
   flutter_test:
