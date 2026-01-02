@@ -37,16 +37,68 @@ class _LocationScreenState extends State<LocationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF3F4F6),
       appBar: AppBar(
-        title: Text('${widget.deviceName} - Location'),
+        elevation: 0,
         backgroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Current Location'),
-            Tab(text: 'Location History'),
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new,
+              size: 20, color: Colors.black87),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Column(
+          children: [
+            const Text(
+              'Location Tracking',
+              style: TextStyle(
+                color: Colors.black87,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Text(
+              widget.deviceName,
+              style: TextStyle(
+                color: Colors.grey[500],
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
           ],
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  ),
+                ],
+              ),
+              labelColor: const Color(0xFF2563EB),
+              unselectedLabelColor: Colors.grey[600],
+              labelStyle:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+              tabs: const [
+                Tab(text: 'Current Status'),
+                Tab(text: 'History Log'),
+              ],
+            ),
+          ),
         ),
       ),
       body: TabBarView(
@@ -100,7 +152,9 @@ class _RealTimeLocationView extends StatelessWidget {
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: CircularProgressIndicator(color: Color(0xFF2563EB)),
+          );
         }
 
         final data = snapshot.data!.data() as Map<String, dynamic>?;
@@ -109,63 +163,201 @@ class _RealTimeLocationView extends StatelessWidget {
             (data?['locationLastUpdated'] as Timestamp?)?.toDate();
 
         if (geoPoint == null) {
-          return const Center(child: Text('No location data available yet.'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.location_off_outlined,
+                    size: 64, color: Colors.grey[400]),
+                const SizedBox(height: 16),
+                Text(
+                  'No location data available',
+                  style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                ),
+              ],
+            ),
+          );
         }
 
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Last Known Location:',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+        return Stack(
+          children: [
+            Column(
+              children: [
+                Container(
+                  height: MediaQuery.of(context).size.height * 0.3,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2563EB).withOpacity(0.05),
+                    image: DecorationImage(
+                      image: const NetworkImage(
+                          'https://maps.googleapis.com/maps/api/staticmap?center=0,0&zoom=1&size=1x1&sensor=false'),
+                      colorFilter: ColorFilter.mode(
+                        Colors.grey.withOpacity(0.2),
+                        BlendMode.dstATop,
+                      ),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB).withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Container(
+                          width: 50,
+                          height: 50,
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFF2563EB).withOpacity(0.3),
+                                blurRadius: 15,
+                                spreadRadius: 5,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(Icons.my_location,
+                              color: Color(0xFF2563EB), size: 30),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      FutureBuilder<String>(
-                        future: _getAddressFromGeoPoint(geoPoint),
-                        builder: (context, addressSnapshot) {
-                          if (!addressSnapshot.hasData) {
-                            return const CircularProgressIndicator();
-                          }
-                          return Text(
-                            addressSnapshot.data!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 16),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      if (lastUpdated != null)
-                        Text(
-                          'Updated: ${DateFormat.yMd().add_jm().format(lastUpdated.toLocal())}',
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: () =>
-                    _launchMapsUrl(geoPoint.latitude, geoPoint.longitude),
-                icon: const Icon(Icons.map),
-                label: const Text('View on Map'),
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
+              ],
+            ),
+            Positioned(
+              top: MediaQuery.of(context).size.height * 0.25,
+              left: 20,
+              right: 20,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.08),
+                      blurRadius: 20,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.green.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircleAvatar(
+                                radius: 3,
+                                backgroundColor: Colors.green,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'Active now',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Spacer(),
+                        if (lastUpdated != null)
+                          Text(
+                            DateFormat.jm().format(lastUpdated.toLocal()),
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Current Location',
+                      style: TextStyle(
+                        color: Colors.grey,
+                        fontSize: 12,
+                        letterSpacing: 1,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    FutureBuilder<String>(
+                      future: _getAddressFromGeoPoint(geoPoint),
+                      builder: (context, addressSnapshot) {
+                        if (!addressSnapshot.hasData) {
+                          return const Padding(
+                            padding: EdgeInsets.all(12.0),
+                            child: SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          );
+                        }
+                        return Text(
+                          addressSnapshot.data!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black87,
+                            height: 1.3,
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    if (lastUpdated != null)
+                      Text(
+                        DateFormat.yMMMMd().format(lastUpdated.toLocal()),
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 12,
+                        ),
+                      ),
+                    const SizedBox(height: 32),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _launchMapsUrl(
+                            geoPoint.latitude, geoPoint.longitude),
+                        icon: const Icon(Icons.map_outlined),
+                        label: const Text('Open in Google Maps'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF2563EB),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         );
       },
     );
@@ -226,45 +418,169 @@ class _LocationHistoryView extends StatelessWidget {
           .snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF2563EB)));
         }
         if (snapshot.data!.docs.isEmpty) {
-          return const Center(child: Text('No location history recorded yet.'));
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.history_toggle_off,
+                    size: 48, color: Colors.grey[300]),
+                const SizedBox(height: 16),
+                Text('No history recorded',
+                    style: TextStyle(color: Colors.grey[500])),
+              ],
+            ),
+          );
         }
         final historyDocs = snapshot.data!.docs;
 
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: ElevatedButton(
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: Colors.white,
+              child: ElevatedButton.icon(
                 onPressed: () => _launchMapsDirectionsUrl(
                   historyDocs.reversed.toList(),
                 ),
-                child: const Text('Show Full Path in Google Maps'),
+                icon: const Icon(Icons.timeline, size: 20),
+                label: const Text('Visualize Full Path'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: const Color(0xFF2563EB),
+                  elevation: 0,
+                  side: const BorderSide(color: Color(0xFF2563EB)),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
               ),
             ),
-            const Divider(height: 1),
             Expanded(
               child: ListView.builder(
+                padding: const EdgeInsets.all(16),
                 itemCount: historyDocs.length,
                 itemBuilder: (context, index) {
                   final doc = historyDocs[index];
                   final geoPoint = doc['location'] as GeoPoint;
                   final timestamp = (doc['timestamp'] as Timestamp).toDate();
+                  final isLast = index == historyDocs.length - 1;
 
-                  return ListTile(
-                    leading: const Icon(Icons.location_pin),
-                    title: FutureBuilder<String>(
-                      future: _getAddressFromGeoPoint(geoPoint),
-                      builder: (context, addressSnapshot) {
-                        return Text(
-                          addressSnapshot.data ?? 'Loading address...',
-                        );
-                      },
-                    ),
-                    subtitle: Text(
-                      DateFormat.yMd().add_jm().format(timestamp.toLocal()),
+                  return IntrinsicHeight(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          width: 60,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                DateFormat('h:mm a')
+                                    .format(timestamp.toLocal()),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                DateFormat('MMM d').format(timestamp.toLocal()),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey[500],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Column(
+                          children: [
+                            Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: index == 0
+                                    ? const Color(0xFF2563EB)
+                                    : Colors.white,
+                                border: Border.all(
+                                  color: const Color(0xFF2563EB),
+                                  width: 2,
+                                ),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            if (!isLast)
+                              Expanded(
+                                child: Container(
+                                  width: 2,
+                                  color: Colors.grey[300],
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 24.0),
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.03),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  FutureBuilder<String>(
+                                    future: _getAddressFromGeoPoint(geoPoint),
+                                    builder: (context, addressSnapshot) {
+                                      if (!addressSnapshot.hasData) {
+                                        return Container(
+                                          height: 10,
+                                          width: 100,
+                                          color: Colors.grey[100],
+                                        );
+                                      }
+                                      return Text(
+                                        addressSnapshot.data ??
+                                            'Loading address...',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[800],
+                                          height: 1.4,
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${geoPoint.latitude.toStringAsFixed(5)}, ${geoPoint.longitude.toStringAsFixed(5)}',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.grey[400],
+                                      fontFamily: 'Courier',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   );
                 },

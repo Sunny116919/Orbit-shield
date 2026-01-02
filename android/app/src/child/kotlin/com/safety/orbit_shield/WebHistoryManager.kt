@@ -15,7 +15,6 @@ class WebHistoryManager(private val context: Context) {
     private var lastCapturedUrl = ""
     private var lastCaptureTime = 0L
 
-    // Added Xiaomi/Mi Browser to the list
     private val browserPackages = setOf(
         "com.android.chrome",
         "com.google.android.apps.chrome",
@@ -24,20 +23,17 @@ class WebHistoryManager(private val context: Context) {
         "com.sec.android.app.sbrowser",
         "com.opera.browser",
         "com.brave.browser",
-        "com.mi.global.browser", // Xiaomi Browser
-        "com.mi.global.browser.mini" // Xiaomi Mint Browser
+        "com.mi.global.browser", 
+        "com.mi.global.browser.mini" 
     )
 
     fun processEvent(packageName: String, rootNode: AccessibilityNodeInfo?) {
-        // If it's not a supported browser, ignore it
         if (!browserPackages.contains(packageName) || rootNode == null) return
 
-        // scanTreeForUrl will recursively search EVERY node for a URL
         val url = scanTreeForUrl(rootNode)
 
         if (url.isNotEmpty()) {
             val currentTime = System.currentTimeMillis()
-            // Debounce: Don't save the same URL multiple times within 5 seconds
             if (url != lastCapturedUrl || (currentTime - lastCaptureTime > 5000)) {
                 Log.d(TAG, "✅ CAPTURED URL: $url")
                 saveUrlToBuffer(url, packageName)
@@ -47,18 +43,15 @@ class WebHistoryManager(private val context: Context) {
         }
     }
 
-    // Recursive function to find ANY text that looks like a URL
     private fun scanTreeForUrl(node: AccessibilityNodeInfo?): String {
         if (node == null) return ""
 
-        // 1. Check current node text
         val text = node.text?.toString() ?: ""
         val contentDesc = node.contentDescription?.toString() ?: ""
 
         if (isValidUrl(text)) return text
         if (isValidUrl(contentDesc)) return contentDesc
 
-        // 2. Check all children (Recursive)
         for (i in 0 until node.childCount) {
             val foundUrl = scanTreeForUrl(node.getChild(i))
             if (foundUrl.isNotEmpty()) return foundUrl
@@ -68,14 +61,11 @@ class WebHistoryManager(private val context: Context) {
     }
 
     private fun isValidUrl(text: String): Boolean {
-        // 1. Must contain a dot
         if (!text.contains(".")) return false
         
-        // 2. Filter out system messages or search prompts
         if (text.contains("Search", true) || text.contains("Type", true) || text.contains("Google")) return false
-        if (text.contains(" ")) return false // URLs usually don't have spaces
+        if (text.contains(" ")) return false 
 
-        // 3. Must look like a domain or link
         return text.startsWith("http") || 
                text.startsWith("www") || 
                text.endsWith(".com") || 

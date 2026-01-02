@@ -20,6 +20,9 @@ class _AppUsageScreenState extends State<AppUsageScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
+  final Color _primaryColor = const Color(0xFF5C6BC0); 
+  final Color _backgroundColor = const Color(0xFFF5F7FA);
+
   @override
   void initState() {
     super.initState();
@@ -59,18 +62,27 @@ class _AppUsageScreenState extends State<AppUsageScreen>
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+          return Center(
+              child: CircularProgressIndicator(color: _primaryColor));
         }
 
         if (!snapshot.hasData || !snapshot.data!.exists) {
           return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'No app usage data found for "$titlePrefix". Refresh from the device details screen to fetch it.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 16, color: Colors.grey),
-              ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.hourglass_empty_rounded,
+                    size: 64, color: Colors.grey[300]),
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
+                  child: Text(
+                    'No usage data for "$titlePrefix".\nRefresh from device details.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                  ),
+                ),
+              ],
             ),
           );
         }
@@ -94,103 +106,205 @@ class _AppUsageScreenState extends State<AppUsageScreen>
         final startDateString = data['startDate'] as String?;
         final endDateString = data['endDate'] as String?;
         String dateRange = titlePrefix;
+        
         if (startDateString != null && endDateString != null) {
           final start = DateTime.tryParse(startDateString)?.toLocal();
           final end = DateTime.tryParse(endDateString)?.toLocal();
           if (start != null && end != null) {
             if (firestoreDocName == 'today_stats') {
-              dateRange = "Today (${DateFormat.yMd().format(start)})";
+              dateRange = "Today, ${DateFormat.MMMd().format(start)}";
             } else if (firestoreDocName == 'last_24h_stats') {
               dateRange = "Last 24 Hours";
             } else {
               dateRange =
-                  "${DateFormat.yMd().format(start)} - ${DateFormat.yMd().format(end)}";
+                  "${DateFormat.MMMd().format(start)} - ${DateFormat.MMMd().format(end)}";
             }
           }
         }
 
         return Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: 8.0,
-                horizontal: 16.0,
-              ),
-              child: Text(
-                "Usage for: $dateRange",
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
             if (showTotal)
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  vertical: 8.0,
-                  horizontal: 16.0,
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [_primaryColor, _primaryColor.withOpacity(0.8)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _primaryColor.withOpacity(0.3),
+                      blurRadius: 10,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Total Screen Time',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      _formatDuration(totalDuration),
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(fontWeight: FontWeight.bold),
+                      dateRange.toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
                     ),
                     const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Total Screen Time',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _formatDuration(totalDuration),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.access_time_filled, color: Colors.white, size: 30),
+                        )
+                      ],
+                    ),
                   ],
                 ),
               ),
+
             if (lastUpdated != null)
               Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: Text(
-                  'Last updated: ${DateFormat.yMd().add_jm().format(lastUpdated.toLocal())}',
-                  style: Theme.of(context).textTheme.bodySmall,
+                padding: const EdgeInsets.only(bottom: 8.0, left: 20, right: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.sync, size: 14, color: Colors.grey[500]),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Synced: ${DateFormat.jm().format(lastUpdated.toLocal())}',
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                    ),
+                  ],
                 ),
               ),
-            const Divider(height: 1),
+
             Expanded(
               child: apps.isEmpty
-                  ? const Center(
+                  ? Center(
                       child: Text(
-                        "No usage recorded for this period.",
-                        style: TextStyle(color: Colors.grey),
+                        "No usage recorded.",
+                        style: TextStyle(color: Colors.grey[400]),
                       ),
                     )
                   : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
                       itemCount: apps.length,
                       itemBuilder: (context, index) {
                         final app = apps[index];
-                        final totalMinutes = app['totalUsageMinutes'] ?? 0;
-                        final duration = Duration(minutes: totalMinutes);
-                        String usageString;
-                        if (duration.inHours > 0) {
-                          usageString =
-                              '${duration.inHours}h ${duration.inMinutes.remainder(60)}m';
-                        } else {
-                          usageString = '${duration.inMinutes}m';
-                        }
+                        final appUsageMinutes = (app['totalUsageMinutes'] as num? ?? 0).toInt();
+                        final duration = Duration(minutes: appUsageMinutes);
 
-                        return ListTile(
-                          leading: const Icon(
-                            Icons.android,
-                            color: Colors.grey,
+                        double usagePercent = totalMinutes > 0 
+                            ? (appUsageMinutes / totalMinutes) 
+                            : 0.0;
+                        if(usagePercent > 1.0) usagePercent = 1.0;
+
+                        String usageString = _formatDuration(duration);
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.04),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                          title: Text(
-                            app['appName'] ??
-                                app['packageName'] ??
-                                'Unknown App',
-                          ),
-                          trailing: Text(
-                            usageString,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
+                          child: Padding(
+                            padding: const EdgeInsets.all(16.0),
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: _primaryColor.withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    Icons.android,
+                                    color: _primaryColor,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        app['appName'] ?? app['packageName'] ?? 'Unknown App',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                          color: Colors.black87,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 6),
+                                      ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: LinearProgressIndicator(
+                                          value: usagePercent,
+                                          backgroundColor: Colors.grey[200],
+                                          valueColor: AlwaysStoppedAnimation<Color>(_primaryColor.withOpacity(0.7)),
+                                          minHeight: 6,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                
+                                const SizedBox(width: 12),
+                                
+                                Text(
+                                  usageString,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         );
@@ -206,17 +320,58 @@ class _AppUsageScreenState extends State<AppUsageScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: _backgroundColor,
       appBar: AppBar(
-        title: Text('${widget.deviceName} - App Usage'),
+        elevation: 0,
         backgroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Today'),
-            Tab(text: 'Last 24h'),
-            Tab(text: 'Last 30d'),
+        centerTitle: true,
+        title: Column(
+          children: [
+            const Text(
+              'App Usage',
+              style: TextStyle(
+                  color: Colors.black87,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold),
+            ),
+            Text(
+              widget.deviceName,
+              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+            ),
           ],
+        ),
+        iconTheme: const IconThemeData(color: Colors.black87),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(25.0),
+            ),
+            child: TabBar(
+              controller: _tabController,
+              indicator: BoxDecoration(
+                borderRadius: BorderRadius.circular(25.0),
+                color: _primaryColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: _primaryColor.withOpacity(0.3),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              ),
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.grey,
+              labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+              tabs: const [
+                Tab(text: 'Today'),
+                Tab(text: '24h'),
+                Tab(text: '30d'),
+              ],
+            ),
+          ),
         ),
       ),
       body: TabBarView(

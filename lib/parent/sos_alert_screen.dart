@@ -59,10 +59,15 @@ class SosAlertScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFFEF2F2),
       appBar: AppBar(
-        title: const Text('SOS EMERGENCY'),
-        backgroundColor: Colors.red,
+        title: const Text(
+          'EMERGENCY ALERT',
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 1.2),
+        ),
+        backgroundColor: const Color(0xFFDC2626),
+        elevation: 0,
+        centerTitle: true,
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
@@ -71,7 +76,9 @@ class SosAlertScreen extends StatelessWidget {
             .snapshots(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFFDC2626)),
+            );
           }
           final data = snapshot.data!.data() as Map<String, dynamic>;
 
@@ -86,11 +93,46 @@ class SosAlertScreen extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text('SOS alert has been cancelled.'),
-                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(Icons.check_circle_outline,
+                        size: 64, color: Colors.green),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'SOS Cancelled',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'The emergency alert has been resolved.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 32),
                   ElevatedButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Go Back'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black87,
+                      elevation: 0,
+                      side: const BorderSide(color: Colors.grey),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 32, vertical: 16),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text('Return Home'),
                   ),
                 ],
               ),
@@ -99,115 +141,234 @@ class SosAlertScreen extends StatelessWidget {
 
           if (geoPoint == null || timestamp == null) {
             return const Center(
-              child: Text('Waiting for child\'s location data...'),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(color: Color(0xFFDC2626)),
+                  SizedBox(height: 16),
+                  Text('Acquiring location data...'),
+                ],
+              ),
             );
           }
 
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Icon(
-                  Icons.warning_amber_rounded,
-                  color: Colors.red,
-                  size: 100,
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  'EMERGENCY ALERT FROM',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.headlineSmall?.copyWith(color: Colors.red),
-                ),
-                Text(
-                  deviceName.toUpperCase(),
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-                const SizedBox(height: 20),
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(20.0),
+              child: Column(
+                children: [
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDC2626).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border:
+                          Border.all(color: const Color(0xFFDC2626), width: 2),
+                    ),
+                    child: const Icon(
+                      Icons.warning_rounded,
+                      color: Color(0xFFDC2626),
+                      size: 40,
+                    ),
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Last known location updated at: ${DateFormat.yMd().add_jm().format(timestamp.toLocal())}',
+                  const SizedBox(height: 16),
+                  Text(
+                    'SOS TRIGGERED',
+                    style: TextStyle(
+                      color: Colors.red[800],
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    deviceName,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFDC2626).withOpacity(0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 8),
                         ),
-                        const SizedBox(height: 10),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue[50],
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(Icons.location_on,
+                                  color: Colors.blue[700], size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Current Location',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[600],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const Spacer(),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                DateFormat('h:mm a').format(timestamp.toLocal()),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
                         FutureBuilder<String>(
                           future: _getAddressFromGeoPoint(geoPoint),
                           builder: (context, addressSnapshot) {
                             if (addressSnapshot.connectionState ==
                                 ConnectionState.waiting) {
-                              return const Padding(
-                                padding: EdgeInsets.all(8.0),
-                                child: CircularProgressIndicator(),
+                              return Container(
+                                height: 20,
+                                width: 150,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[200],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
                               );
                             }
                             return Text(
                               addressSnapshot.data ?? "Could not get address",
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(fontSize: 16),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                height: 1.5,
+                                color: Colors.black87,
+                                fontWeight: FontWeight.w500,
+                              ),
                             );
                           },
+                        ),
+                        const SizedBox(height: 20),
+                        SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _launchMapsUrl(
+                                geoPoint.latitude, geoPoint.longitude),
+                            icon: const Icon(Icons.map_outlined, size: 18),
+                            label: const Text('Open in Maps'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: Colors.blue[700],
+                              side: BorderSide(color: Colors.blue[200]!),
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
                         ),
                       ],
                     ),
                   ),
-                ),
-                const Spacer(),
-                ElevatedButton.icon(
-                  onPressed: () =>
-                      _launchMapsUrl(geoPoint.latitude, geoPoint.longitude),
-                  icon: const Icon(Icons.map),
-                  label: const Text('VIEW LOCATION ON MAP'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 16),
+                  const Spacer(),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: isRinging ? null : _requestForceRing,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFF59E0B),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(isRinging
+                                  ? Icons.volume_up_rounded
+                                  : Icons.notifications_active_outlined),
+                              const SizedBox(height: 4),
+                              Text(
+                                isRinging ? 'Ringing...' : 'Force Ring',
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            _cancelSosAlert();
+                            Navigator.of(context).pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: Colors.black87,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                            elevation: 0,
+                            side: BorderSide(color: Colors.grey[300]!, width: 2),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          child: const Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.check_circle_outline, color: Colors.green),
+                              SizedBox(height: 4),
+                              Text(
+                                'Mark Safe',
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: isRinging ? null : _requestForceRing,
-                  icon: Icon(
-                    isRinging
-                        ? Icons.volume_up_rounded
-                        : Icons.volume_off_rounded,
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.grey[600],
+                      ),
+                      child: const Text('Dismiss Screen'),
+                    ),
                   ),
-                  label: Text(isRinging ? 'RINGING...' : 'FORCE RING PHONE'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: isRinging ? Colors.grey : Colors.orange,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                OutlinedButton(
-                  onPressed: () {
-                    _cancelSosAlert();
-                    Navigator.of(context).pop();
-                  },
-                  child: const Text('MARK AS SAFE'),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Colors.grey),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 16),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },

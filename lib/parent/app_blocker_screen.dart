@@ -60,23 +60,36 @@ class _AppBlockerScreenState extends State<AppBlockerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text('App Blocker'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        centerTitle: true,
+        title: const Text(
+          'App Blocker',
+          style: TextStyle(
+            color: Colors.black87,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        iconTheme: const IconThemeData(color: Colors.black87),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(kToolbarHeight),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+          preferredSize: const Size.fromHeight(80),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: TextField(
               decoration: InputDecoration(
-                hintText: 'Search for an app...',
-                prefixIcon: Icon(Icons.search),
+                hintText: 'Search applications...',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                prefixIcon: const Icon(Icons.search, color: Color(0xFF5C6BC0)),
+                filled: true,
+                fillColor: const Color(0xFFF0F2F5),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(30.0),
+                  borderRadius: BorderRadius.circular(16.0),
                   borderSide: BorderSide.none,
                 ),
-                filled: true,
-                fillColor: Colors.grey[200],
-                contentPadding: EdgeInsets.zero,
+                contentPadding: const EdgeInsets.symmetric(vertical: 16),
               ),
               onChanged: (value) {
                 setState(() {
@@ -91,17 +104,26 @@ class _AppBlockerScreenState extends State<AppBlockerScreen> {
         stream: _installedAppsRef.snapshots(),
         builder: (context, installedAppsSnapshot) {
           if (installedAppsSnapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
+            return const Center(
+              child: CircularProgressIndicator(color: Color(0xFF5C6BC0)),
+            );
           }
           if (!installedAppsSnapshot.hasData || !installedAppsSnapshot.data!.exists) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  'No installed apps list found.\n\nPlease go back and press the "Refresh" button on the "Installed Apps" tile.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, color: Colors.grey),
-                ),
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.app_blocking_outlined, size: 64, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 32.0),
+                    child: Text(
+                      'No installed apps found.\nPlease refresh from the "Installed Apps" screen.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.grey),
+                    ),
+                  ),
+                ],
               ),
             );
           }
@@ -109,18 +131,18 @@ class _AppBlockerScreenState extends State<AppBlockerScreen> {
           final appData = installedAppsSnapshot.data!.data() as Map<String, dynamic>;
           final List<dynamic> installedApps = appData['apps'] ?? [];
 
-          installedApps.sort((a, b) => (a['appName'] as String).toLowerCase().compareTo((b['appName'] as String).toLowerCase()));
+          installedApps.sort((a, b) => (a['appName'] as String)
+              .toLowerCase()
+              .compareTo((b['appName'] as String).toLowerCase()));
 
           final List<dynamic> filteredApps = installedApps.where((app) {
             final String appName = (app['appName'] ?? '').toLowerCase();
             return appName.contains(_searchQuery);
           }).toList();
 
-
           return StreamBuilder<DocumentSnapshot>(
             stream: _blockedAppsRef.snapshots(),
             builder: (context, blockedAppsSnapshot) {
-              
               List<String> blockedPackages = [];
               if (blockedAppsSnapshot.hasData && blockedAppsSnapshot.data!.exists) {
                 final blockedData = blockedAppsSnapshot.data!.data() as Map<String, dynamic>;
@@ -128,6 +150,7 @@ class _AppBlockerScreenState extends State<AppBlockerScreen> {
               }
 
               return ListView.builder(
+                padding: const EdgeInsets.all(16),
                 itemCount: filteredApps.length,
                 itemBuilder: (context, index) {
                   final app = filteredApps[index];
@@ -135,19 +158,104 @@ class _AppBlockerScreenState extends State<AppBlockerScreen> {
                   final String packageName = app['packageName'] ?? '';
 
                   if (packageName.isEmpty) {
-                    return SizedBox.shrink(); 
+                    return const SizedBox.shrink();
                   }
 
                   final bool isBlocked = blockedPackages.contains(packageName);
 
-                  return SwitchListTile(
-                    title: Text(appName),
-                    subtitle: Text(packageName, style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-                    value: isBlocked,
-                    activeColor: Colors.red,
-                    onChanged: (bool newValue) {
-                      _toggleBlockStatus(packageName, newValue);
-                    },
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                      border: isBlocked 
+                          ? Border.all(color: Colors.red.withOpacity(0.3), width: 1.5)
+                          : Border.all(color: Colors.transparent),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: isBlocked
+                                    ? [const Color(0xFFFFEBEE), const Color(0xFFFFCDD2)]
+                                    : [const Color(0xFFE8EAF6), const Color(0xFFC5CAE9)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Icon(
+                              isBlocked ? Icons.block : Icons.android,
+                              color: isBlocked ? Colors.red[400] : const Color(0xFF5C6BC0),
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  appName,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: isBlocked ? Colors.red[900] : Colors.black87,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  packageName,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                    fontFamily: 'Courier',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          Column(
+                            children: [
+                              Switch.adaptive(
+                                value: isBlocked,
+                                activeColor: Colors.red,
+                                activeTrackColor: Colors.red.withOpacity(0.2),
+                                inactiveThumbColor: Colors.grey[400],
+                                inactiveTrackColor: Colors.grey[200],
+                                onChanged: (bool newValue) {
+                                  _toggleBlockStatus(packageName, newValue);
+                                },
+                              ),
+                              Text(
+                                isBlocked ? "BLOCKED" : "ALLOWED",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: isBlocked ? Colors.red : Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
                   );
                 },
               );

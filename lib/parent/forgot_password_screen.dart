@@ -1,55 +1,32 @@
 import 'package:flutter/material.dart';
 import '../../services/auth_service.dart';
 
-class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({super.key});
+class ForgotPasswordScreen extends StatefulWidget {
+  const ForgotPasswordScreen({super.key});
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  State<ForgotPasswordScreen> createState() => _ForgotPasswordScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
+class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
   final AuthService _authService = AuthService();
 
   bool _isLoading = false;
-  bool _isPasswordVisible = false;
 
-  String? _validatePassword(String? value) {
-    if (value == null || value.isEmpty) {
-      return 'Please enter a password';
-    }
-    if (value.length < 8) {
-      return 'Password must be at least 8 characters';
-    }
-    if (!value.contains(RegExp(r'[A-Z]'))) {
-      return 'Password must contain at least one uppercase letter';
-    }
-    if (!value.contains(RegExp(r'[0-9]'))) {
-      return 'Password must contain at least one number';
-    }
-    if (!value.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'))) {
-      return 'Password must contain at least one special character';
-    }
-    return null;
-  }
-
-  void _handleSignUp() async {
+  void _handleResetPassword() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
       try {
-        await _authService.signUpWithEmailAndPassword(
-          _emailController.text.trim(),
-          _passwordController.text.trim(),
-        );
+        await _authService.sendPasswordResetEmail(_emailController.text.trim());
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Account created successfully!'),
+              content: Text('Reset link sent! Check your email.'),
               backgroundColor: Colors.green,
+              duration: Duration(seconds: 4),
             ),
           );
           Navigator.pop(context);
@@ -87,11 +64,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.arrow_back,
-              color: Colors.black87,
-              size: 20,
-            ),
+            child: const Icon(Icons.arrow_back, color: Colors.black87, size: 20),
           ),
           onPressed: () => Navigator.pop(context),
         ),
@@ -104,22 +77,46 @@ class _SignUpScreenState extends State<SignUpScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                const SizedBox(height: 10),
+                const SizedBox(height: 20),
+                Container(
+                  height: 100,
+                  width: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2563EB).withOpacity(0.15),
+                        blurRadius: 20,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Icon(Icons.lock_reset_rounded, size: 50, color: Color(0xFF2563EB)),
+                  ),
+                ),
+                const SizedBox(height: 40),
                 Text(
-                  'Create Account',
+                  'Forgot Password?',
+                  textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     color: const Color(0xFF1A1A1A),
                     letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Sign up to get started with Orbit Shield',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 16,
-                    height: 1.5,
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    "Check passwword reset link in spam/junk folder if you don't see it in your inbox.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 16,
+                      height: 1.5,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 40),
@@ -131,13 +128,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   keyboardType: TextInputType.emailAddress,
                   style: const TextStyle(fontWeight: FontWeight.w500),
                   validator: (value) {
-                    if (value == null || value.isEmpty)
-                      return 'Please enter your email';
-                    final emailRegex = RegExp(
-                      r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                    );
-                    if (!emailRegex.hasMatch(value))
-                      return 'Please enter a valid email';
+                    if (value == null || value.isEmpty) return 'Please enter your email';
+                    final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+                    if (!emailRegex.hasMatch(value)) return 'Please enter a valid email';
                     return null;
                   },
                   decoration: _inputDecoration(
@@ -145,67 +138,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     icon: Icons.email_outlined,
                   ),
                 ),
-                const SizedBox(height: 24),
-
-                _buildLabel('Password'),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: !_isPasswordVisible,
-                  validator: _validatePassword,
-                  autovalidateMode: AutovalidateMode.onUserInteraction,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                  decoration:
-                      _inputDecoration(
-                        hint: '••••••••',
-                        icon: Icons.lock_outline,
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isPasswordVisible
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                            color: Colors.grey,
-                          ),
-                          onPressed: () => setState(
-                            () => _isPasswordVisible = !_isPasswordVisible,
-                          ),
-                        ),
-                      ).copyWith(
-                        helperText:
-                            'Must contain 8+ chars, 1 Uppercase, 1 Number & 1 Symbol',
-                        helperMaxLines: 2,
-                        helperStyle: TextStyle(
-                          color: Colors.grey[500],
-                          fontSize: 12,
-                        ),
-                      ),
-                ),
-                const SizedBox(height: 24),
-
-                _buildLabel('Confirm Password'),
-                const SizedBox(height: 8),
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  obscureText: !_isPasswordVisible,
-                  style: const TextStyle(fontWeight: FontWeight.w500),
-                  validator: (value) {
-                    if (value == null || value.isEmpty)
-                      return 'Please confirm your password';
-                    if (value != _passwordController.text)
-                      return 'Passwords do not match';
-                    return null;
-                  },
-                  decoration: _inputDecoration(
-                    hint: '••••••••',
-                    icon: Icons.check_circle_outline,
-                  ),
-                ),
                 const SizedBox(height: 40),
 
                 SizedBox(
                   height: 56,
                   child: ElevatedButton(
-                    onPressed: _isLoading ? null : _handleSignUp,
+                    onPressed: _isLoading ? null : _handleResetPassword,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
                       foregroundColor: Colors.white,
@@ -225,7 +163,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             ),
                           )
                         : const Text(
-                            'Create Account',
+                            'Send Reset Code',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,
@@ -256,13 +194,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
   InputDecoration _inputDecoration({
     required String hint,
     required IconData icon,
-    Widget? suffixIcon,
   }) {
     return InputDecoration(
       hintText: hint,
       hintStyle: TextStyle(color: Colors.grey[400]),
       prefixIcon: Icon(icon, color: Colors.grey[500], size: 22),
-      suffixIcon: suffixIcon,
       filled: true,
       fillColor: Colors.white,
       contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),

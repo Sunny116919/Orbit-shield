@@ -27,9 +27,10 @@ class _PermissionScreenState extends State<PermissionScreen>
   bool _isGpsEnabled = false;
   bool _isBatteryOptimizationDisabled = false;
   bool _isDndAccessGranted = false;
-  bool _isNotificationListenerGranted = false; 
-    static const MethodChannel _notificationChannel = 
-      MethodChannel('com.orbitshield.app/notifications');
+  bool _isNotificationListenerGranted = false;
+  static const MethodChannel _notificationChannel = MethodChannel(
+    'com.orbitshield.app/notifications',
+  );
 
   @override
   void initState() {
@@ -61,13 +62,16 @@ class _PermissionScreenState extends State<PermissionScreen>
     final isGpsEnabled = await Geolocator.isLocationServiceEnabled();
     final isBatteryOptDisabled =
         await DisableBatteryOptimization.isBatteryOptimizationDisabled;
-    
-    final isDndGranted = await DndPermission.PermissionHandler.permissionsGranted;
+
+    final isDndGranted =
+        await DndPermission.PermissionHandler.permissionsGranted;
 
     bool isNotifListenerGranted = false;
     if (Platform.isAndroid) {
       try {
-        isNotifListenerGranted = await _notificationChannel.invokeMethod('isPermissionGranted');
+        isNotifListenerGranted = await _notificationChannel.invokeMethod(
+          'isPermissionGranted',
+        );
       } catch (e) {
         print("Error checking notification permission: $e");
       }
@@ -174,277 +178,299 @@ class _PermissionScreenState extends State<PermissionScreen>
         _isNotificationListenerGranted;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF5F7FA),
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Icon(Icons.shield_outlined, size: 80, color: Colors.grey),
-              const SizedBox(height: 20),
-              const Text(
-                'Setup Required',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-              const Text(
-                'Please grant the following permissions to continue:',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              Expanded(
-                child: ListView(
-                  children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Camera Permission',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text('Needed to scan the QR code.'),
-                      trailing: _isCameraGranted
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 30,
-                            )
-                          : ElevatedButton(
-                              onPressed: _requestCameraPermission,
-                              child: const Text('Allow'),
-                            ),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Call Log Permission',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text('Needed to see call history.'),
-                      trailing: _isCallLogGranted
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 30,
-                            )
-                          : ElevatedButton(
-                              onPressed: _requestCallLogPermission,
-                              child: const Text('Allow'),
-                            ),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'SMS Permission',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text('Needed to read text messages.'),
-                      trailing: _isSmsGranted
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 30,
-                            )
-                          : ElevatedButton(
-                              onPressed: _requestSmsPermission,
-                              child: const Text('Allow'),
-                            ),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Contacts Permission',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text('Needed to show contact names.'),
-                      trailing: _isContactsGranted
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 30,
-                            )
-                          : ElevatedButton(
-                              onPressed: _requestContactsPermission,
-                              child: const Text('Allow'),
-                            ),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Location Permission',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text('Needed for location tracking.'),
-                      trailing: _isLocationGranted
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 30,
-                            )
-                          : ElevatedButton(
-                              onPressed: _requestLocationPermission,
-                              child: const Text('Allow'),
-                            ),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'GPS / Location Service',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text('Must be enabled for tracking.'),
-                      trailing: _isGpsEnabled
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 30,
-                            )
-                          : ElevatedButton(
-                              onPressed: _openGpsSettings,
-                              child: const Text('Allow'),
-                            ),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Background Location',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text('Select "Allow all the time".'),
-                      trailing: _isBackgroundLocationGranted
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 30,
-                            )
-                          : ElevatedButton(
-                              onPressed: !_isLocationGranted
-                                  ? null
-                                  : _requestBackgroundLocationPermission,
-                              child: const Text('Allow'),
-                            ),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Background Activity',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text('Set to "No restrictions".'),
-                      trailing: ElevatedButton(
-                        onPressed: _openBackgroundSettings,
-                        child: const Text('Settings'),
-                      ),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'App Usage Access',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text('Needed to monitor screen time.'),
-                      trailing: ElevatedButton(
-                        onPressed: _openUsageSettings,
-                        child: const Text('Settings'),
-                      ),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Do Not Disturb Access',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle:
-                          const Text('Needed to force ring on silent mode.'),
-                      trailing: _isDndAccessGranted
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 30,
-                            )
-                          : ElevatedButton(
-                              onPressed: _requestDndAccess,
-                              child: const Text('Settings'),
-                            ),
-                    ),
-
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Notification Access',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text(
-                        'Needed to read notification history.',
-                      ),
-                      trailing: _isNotificationListenerGranted
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 30,
-                            )
-                          : ElevatedButton(
-                              onPressed: _requestNotificationListenerPermission,
-                              child: const Text('Settings'),
-                            ),
-                    ),
-
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Accessibility Service',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text(
-                        'Needed for App Blocker & Web History. Find "Orbit Shield" and enable it.',
-                      ),
-                      trailing: ElevatedButton(
-                        onPressed: _openAccessibilitySettings,
-                        child: const Text('Settings'),
-                      ),
-                    ),
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Disable Battery Optimization',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      subtitle: const Text(
-                        'Find this app, tap it, and select "Don\'t optimize".',
-                      ),
-                      trailing: _isBatteryOptimizationDisabled
-                          ? const Icon(
-                              Icons.check_circle,
-                              color: Colors.green,
-                              size: 30,
-                            )
-                          : ElevatedButton(
-                              onPressed: _requestBatteryOptimization,
-                              child: const Text('Settings'),
-                            ),
-                    ),
-                  ],
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24.0),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.vertical(
+                  bottom: Radius.circular(24),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black12,
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
               ),
-              ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                onPressed: !canContinue
-                    ? null
-                    : () {
-                        Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(
-                            builder: (context) => const QrScannerScreen(),
-                          ),
-                        );
-                      },
-                child: const Text('Continue'),
+              child: Column(
+                children: [
+                  const Icon(
+                    Icons.shield_rounded,
+                    size: 60,
+                    color: Color(0xFF4A90E2),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Setup Required',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: Color(0xFF2D3436),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'To protect this device, please grant the following permissions',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  ),
+                ],
               ),
-            ],
+            ),
+
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  _buildSectionLabel("Basic Permissions"),
+                  _buildPermissionCard(
+                    title: 'Camera',
+                    subtitle: 'Needed to scan the QR code',
+                    icon: Icons.camera_alt,
+                    isGranted: _isCameraGranted,
+                    onTap: _requestCameraPermission,
+                  ),
+                  _buildPermissionCard(
+                    title: 'Call Logs',
+                    subtitle: 'Monitor call history',
+                    icon: Icons.phone_in_talk,
+                    isGranted: _isCallLogGranted,
+                    onTap: _requestCallLogPermission,
+                  ),
+                  _buildPermissionCard(
+                    title: 'SMS Messages',
+                    subtitle: 'Read text messages',
+                    icon: Icons.sms,
+                    isGranted: _isSmsGranted,
+                    onTap: _requestSmsPermission,
+                  ),
+                  _buildPermissionCard(
+                    title: 'Contacts',
+                    subtitle: 'Show contact names',
+                    icon: Icons.contacts,
+                    isGranted: _isContactsGranted,
+                    onTap: _requestContactsPermission,
+                  ),
+
+                  const SizedBox(height: 16),
+                  _buildSectionLabel("Location & Tracking"),
+                  _buildPermissionCard(
+                    title: 'Location',
+                    subtitle: 'Required for tracking',
+                    icon: Icons.location_on,
+                    isGranted: _isLocationGranted,
+                    onTap: _requestLocationPermission,
+                  ),
+                  _buildPermissionCard(
+                    title: 'GPS Service',
+                    subtitle: 'Must be enabled',
+                    icon: Icons.gps_fixed,
+                    isGranted: _isGpsEnabled,
+                    onTap: _openGpsSettings,
+                  ),
+                  _buildPermissionCard(
+                    title: 'Background Location',
+                    subtitle: 'Select "Allow all the time"',
+                    icon: Icons.timelapse,
+                    isGranted: _isBackgroundLocationGranted,
+                    onTap: !_isLocationGranted
+                        ? null
+                        : _requestBackgroundLocationPermission,
+                    isLocked: !_isLocationGranted,
+                  ),
+
+                  const SizedBox(height: 16),
+                  _buildSectionLabel("Advanced Monitoring"),
+                  _buildPermissionCard(
+                    title: 'Background Activity',
+                    subtitle:
+                        'Set to "No restrictions" or\n"Battery Usage" > Enable "Allow Background Activity"',
+                    icon: Icons.battery_alert,
+                    isGranted: false,
+                    isActionAlwaysVisible: true,
+                    onTap: _openBackgroundSettings,
+                    customButtonLabel: "Settings",
+                  ),
+                  _buildPermissionCard(
+                    title: 'App Usage',
+                    subtitle:
+                        'Select "Orbit Shield" > Enable "Permit usage access"',
+                    icon: Icons.data_usage,
+                    isGranted: false,
+                    isActionAlwaysVisible: true,
+                    onTap: _openUsageSettings,
+                    customButtonLabel: "Settings",
+                  ),
+                  _buildPermissionCard(
+                    title: 'Do Not Disturb',
+                    subtitle:
+                        'Select "Orbit Shield" > Enable "Allow Do Not Disturb"',
+                    icon: Icons.do_not_disturb_on,
+                    isGranted: _isDndAccessGranted,
+                    onTap: _requestDndAccess,
+                    customButtonLabel: "Settings",
+                  ),
+                  _buildPermissionCard(
+                    title: 'Notification Access',
+                    subtitle:
+                        'Select "Orbit Shield" > Enable "Allow Notification Access"',
+                    icon: Icons.notifications_active,
+                    isGranted: _isNotificationListenerGranted,
+                    onTap: _requestNotificationListenerPermission,
+                    customButtonLabel: "Settings",
+                  ),
+                  _buildPermissionCard(
+                    title: 'Accessibility',
+                    subtitle:
+                        'Select "Downloaded Apps" > Select "Orbit Shield" > Turn it ON',
+                    icon: Icons.accessibility_new,
+                    isGranted: false,
+                    isActionAlwaysVisible: true,
+                    onTap: _openAccessibilitySettings,
+                    customButtonLabel: "Enable",
+                  ),
+                  _buildPermissionCard(
+                    title: 'Battery Optimization',
+                    subtitle: 'Select "Allow"',
+                    icon: Icons.battery_std,
+                    isGranted: _isBatteryOptimizationDisabled,
+                    onTap: _requestBatteryOptimization,
+                    customButtonLabel: "Disable",
+                  ),
+                  const SizedBox(height: 80),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+
+      bottomSheet: Container(
+        color: const Color(0xFFF5F7FA),
+        padding: const EdgeInsets.all(24.0),
+        child: SizedBox(
+          width: double.infinity,
+          height: 55,
+          child: ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: canContinue
+                  ? const Color(0xFF4A90E2)
+                  : Colors.grey[400],
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: canContinue ? 4 : 0,
+            ),
+            onPressed: !canContinue
+                ? null
+                : () {
+                    Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (context) => const QrScannerScreen(),
+                      ),
+                    );
+                  },
+            child: const Text(
+              'Continue Setup',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSectionLabel(String text) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 8, bottom: 8),
+      child: Text(
+        text.toUpperCase(),
+        style: const TextStyle(
+          color: Colors.grey,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPermissionCard({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool isGranted,
+    required VoidCallback? onTap,
+    bool isLocked = false,
+    bool isActionAlwaysVisible = false,
+    String customButtonLabel = "Allow",
+  }) {
+    final bool showCheck = isGranted && !isActionAlwaysVisible;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 4, offset: Offset(0, 2)),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: showCheck
+                ? Colors.green.withOpacity(0.1)
+                : const Color(0xFF4A90E2).withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            color: showCheck ? Colors.green : const Color(0xFF4A90E2),
+          ),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+        ),
+        trailing: showCheck
+            ? const Icon(Icons.check_circle, color: Colors.green, size: 28)
+            : SizedBox(
+                height: 36,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: isLocked
+                        ? Colors.grey[300]
+                        : const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                  ),
+                  onPressed: onTap,
+                  child: Text(
+                    isLocked ? "Locked" : customButtonLabel,
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ),
       ),
     );
   }

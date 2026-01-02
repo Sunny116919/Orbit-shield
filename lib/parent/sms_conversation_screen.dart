@@ -20,6 +20,19 @@ class SmsConversationScreen extends StatelessWidget {
         dateA.day == dateB.day;
   }
 
+  Color _getAvatarColor(String name) {
+    final List<Color> colors = [
+      const Color(0xFF5C6BC0),
+      const Color(0xFFAB47BC),
+      const Color(0xFFEF5350),
+      const Color(0xFF26A69A),
+      const Color(0xFFFFA726),
+      const Color(0xFF78909C),
+      const Color(0xFF42A5F5),
+    ];
+    return colors[name.length % colors.length];
+  }
+
   @override
   Widget build(BuildContext context) {
     messages.sort((a, b) {
@@ -41,34 +54,95 @@ class SmsConversationScreen extends StatelessWidget {
       items.add(message);
     }
 
+    final displayName = contactName ?? contactAddress;
+    final avatarColor = _getAvatarColor(displayName);
+    final initial = displayName.isNotEmpty ? displayName[0].toUpperCase() : '#';
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: const Color(0xFFF2F4F7),
       appBar: AppBar(
+        elevation: 0,
         backgroundColor: Colors.white,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        iconTheme: const IconThemeData(color: Colors.black87),
+        titleSpacing: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Row(
           children: [
-            Text(contactName ?? contactAddress),
-            if (contactName != null)
-              Text(
-                contactAddress,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.normal,
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: avatarColor.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Center(
+                child: Text(
+                  initial,
+                  style: TextStyle(
+                    color: avatarColor,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    displayName,
+                    style: const TextStyle(
+                      color: Colors.black87,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (contactName != null)
+                    Text(
+                      contactAddress,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.normal,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
       body: ListView.builder(
-        padding: const EdgeInsets.all(8.0),
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
         itemCount: items.length,
         itemBuilder: (context, index) {
           final item = items[index];
 
           if (item is DateTime) {
             return Center(
-              child: Chip(label: Text(DateFormat.yMMMMd().format(item))),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 24),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.grey[200],
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  DateFormat.yMMMMd().format(item),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
             );
           }
 
@@ -80,31 +154,70 @@ class SmsConversationScreen extends StatelessWidget {
           return Align(
             alignment: isSent ? Alignment.centerRight : Alignment.centerLeft,
             child: Column(
-              crossAxisAlignment: isSent
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
+              crossAxisAlignment:
+                  isSent ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
                 Container(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.of(context).size.width * 0.75,
+                  ),
                   padding: const EdgeInsets.symmetric(
-                    vertical: 10,
-                    horizontal: 14,
+                    vertical: 12,
+                    horizontal: 16,
                   ),
-                  margin: const EdgeInsets.symmetric(
-                    vertical: 4,
-                    horizontal: 8,
-                  ),
+                  margin: const EdgeInsets.only(bottom: 4),
                   decoration: BoxDecoration(
-                    color: isSent ? Colors.blue[200] : Colors.grey[300],
-                    borderRadius: BorderRadius.circular(20),
+                    color: isSent ? const Color(0xFF42A5F5) : Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: isSent
+                          ? const Radius.circular(20)
+                          : const Radius.circular(4),
+                      bottomRight: isSent
+                          ? const Radius.circular(4)
+                          : const Radius.circular(20),
+                    ),
                   ),
-                  child: Text(body),
+                  child: Text(
+                    body,
+                    style: TextStyle(
+                      color: isSent ? Colors.white : Colors.black87,
+                      fontSize: 15,
+                      height: 1.3,
+                    ),
+                  ),
                 ),
                 if (date != null)
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
-                    child: Text(
-                      DateFormat.jm().format(date.toLocal()),
-                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    padding: const EdgeInsets.only(bottom: 12.0),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (isSent) ...[
+                          Icon(
+                            Icons.done_all,
+                            size: 14,
+                            color: Colors.blue[300],
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          DateFormat.jm().format(date.toLocal()),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey[500],
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
               ],

@@ -30,9 +30,13 @@ import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 StreamSubscription<DocumentSnapshot>? firestoreSubscription;
 StreamSubscription<AccelerometerEvent>? accelerometerSubscription;
 StreamSubscription<DocumentSnapshot>? blockedAppsSubscription;
+StreamSubscription<List<ConnectivityResult>>? connectivitySubscription;
+StreamSubscription<double>? volumeSubscription;
+
 bool isSosTriggered = false;
 bool isFindingDevice = false;
-
+DateTime _lastVolumeUpdate = DateTime.now();
+const int _volumeUpdateIntervalMs = 500;
 String _normalizePhoneNumber(String number) {
   String digitsOnly = number.replaceAll(RegExp(r'\D'), '');
   if (digitsOnly.length > 10) {
@@ -52,7 +56,6 @@ Future<void> performSosAction() async {
   print('*** SOS TRIGGERED! ***');
   final deviceId = await getDeviceId();
   if (deviceId == null) {
-    print('*** SOS FAILED: Device ID null ***');
     isSosTriggered = false;
     return;
   }
@@ -68,7 +71,7 @@ Future<void> performSosAction() async {
         timeLimit: const Duration(seconds: 1),
       );
       sosLocation = GeoPoint(pos.latitude, pos.longitude);
-      
+
       try {
         List<Placemark> placemarks = await placemarkFromCoordinates(
           pos.latitude,
@@ -83,7 +86,9 @@ Future<void> performSosAction() async {
   } catch (_) {}
 
   try {
-    final docRef = FirebaseFirestore.instance.collection('child_devices').doc(deviceId);
+    final docRef = FirebaseFirestore.instance
+        .collection('child_devices')
+        .doc(deviceId);
     await docRef.update({
       'sos_trigger': true,
       'lastSosTime': FieldValue.serverTimestamp(),
@@ -113,8 +118,17 @@ void onStart(ServiceInstance service) async {
   }
 
   if (service is AndroidServiceInstance) {
-    service.on('setAsForeground').listen((event) => service.setAsForegroundService());
-    service.on('setAsBackground').listen((event) => service.setAsBackgroundService());
+    service.on('setAsForeground').listen((event) {
+      service.setAsForegroundService();
+    });
+    service.on('setAsBackground').listen((event) {
+      service.setAsBackgroundService();
+    });
+
+    service.setForegroundNotificationInfo(
+      title: "Orbit Shield Active",
+      content: "Monitoring device safety...",
+    );
   }
 
   final deviceId = await getDeviceId();
@@ -123,17 +137,37 @@ void onStart(ServiceInstance service) async {
     return;
   }
 
-  service.on('clipboardResult').listen((event) async {
-    final clipboardText = event?['text'];
-    final docRef = FirebaseFirestore.instance.collection('child_devices').doc(deviceId);
-    await docRef.update({
-      'clipboardText': clipboardText ?? 'Clipboard is empty.',
-      'clipboardLastUpdated': FieldValue.serverTimestamp(),
-      'requestClipboard': false,
-    });
+  final docRef = FirebaseFirestore.instance
+      .collection('child_devices')
+      .doc(deviceId);
+
+  volumeSubscription?.cancel();
+  volumeSubscription = FlutterVolumeController.addListener((volume) {
+    final now = DateTime.now();
+    if (now.difference(_lastVolumeUpdate).inMilliseconds >
+        _volumeUpdateIntervalMs) {
+      _lastVolumeUpdate = now;
+      print("🔊 Physical Volume Changed on Device - Syncing to Parent...");
+      _pushVolumeAndRingerStatus(deviceId);
+    }
   });
 
-  // --- Removed legacy 'newUrl' listener here ---
+  connectivitySubscription?.cancel();
+  connectivitySubscription = Connectivity().onConnectivityChanged.listen((
+    List<ConnectivityResult> results,
+  ) async {
+    bool isConnected = results.any((r) => r != ConnectivityResult.none);
+
+    if (isConnected) {
+      print("🌐 INTERNET RESTORED: Triggering Immediate Re-Sync...");
+      await _updateHeartbeat(deviceId);
+      await _checkPendingCommands(deviceId);
+      await _syncNotifications(deviceId);
+      await _syncWebHistory(deviceId);
+    } else {
+      print("❌ DEVICE WENT OFFLINE");
+    }
+  });
 
   double shakeThreshold = 12.0;
   DateTime? lastShakeTime;
@@ -143,7 +177,8 @@ void onStart(ServiceInstance service) async {
     double acceleration = (x * x + y * y + z * z) / (9.8 * 9.8);
     if (acceleration > shakeThreshold) {
       final now = DateTime.now();
-      if (lastShakeTime == null || now.difference(lastShakeTime!).inSeconds > 3) {
+      if (lastShakeTime == null ||
+          now.difference(lastShakeTime!).inSeconds > 3) {
         lastShakeTime = now;
         performSosAction();
       }
@@ -151,251 +186,288 @@ void onStart(ServiceInstance service) async {
   }, onError: (e) => print('*** ACCELEROMETER ERROR: $e ***'));
 
   await firestoreSubscription?.cancel();
-  firestoreSubscription = FirebaseFirestore.instance
-      .collection('child_devices')
-      .doc(deviceId)
-      .snapshots()
-      .listen((snapshot) async {
+  firestoreSubscription = docRef.snapshots().listen((snapshot) async {
     if (!snapshot.exists) {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('childDeviceUID');
-      await accelerometerSubscription?.cancel();
-      await firestoreSubscription?.cancel();
-      await blockedAppsSubscription?.cancel();
       service.invoke('stopSelf');
       return;
     }
 
     final data = snapshot.data()!;
-    final docRef = FirebaseFirestore.instance.collection('child_devices').doc(deviceId);
-
-    if (data.containsKey('requestClipboard') && data['requestClipboard'] == true) {
-      service.invoke('getClipboard');
-    }
-
-    if (data.containsKey('requestAppUsage') && data['requestAppUsage'] == true) {
-       Future.wait([
-        fetchAndUploadTodayAppUsage(deviceId),
-        fetchAndUploadAppUsageForDuration(deviceId, const Duration(hours: 24), 'last_24h_stats'),
-        fetchAndUploadAppUsageForDuration(deviceId, const Duration(days: 30), 'last_30d_stats'),
-      ]).then((_) async {
-        await docRef.update({'requestAppUsage': false});
-      });
-    }
-    
-    if (data.containsKey('requestScreenTimeReport') && data['requestScreenTimeReport'] == true) {
-        _fetchAndUploadDailyReports(deviceId).then((_) async {
-        await docRef.update({'requestScreenTimeReport': false});
-      });
-    }
-
-    if (data.containsKey('requestForceRing') && data['requestForceRing'] == true) {
-       try {
-        await SoundMode.setSoundMode(RingerModeStatus.normal);
-        await docRef.update({'ringerMode': RingerModeStatus.normal.name});
-      } catch (_) {}
-      await docRef.update({'requestForceRing': false});
-    }
-
-    if (data.containsKey('requestFindDevice') && data['requestFindDevice'] == true) {
-       await _performFindDevice(docRef);
-       await docRef.update({'requestFindDevice': false});
-    }
-    
-    if (data.containsKey('setRingerMode')) {
-        _setRingerMode(docRef, data['setRingerMode']);
-    }
-    if (data.containsKey('setRingVolume')) {
-        final vol = (data['setRingVolume'] as num).toDouble();
-        _setVolume(AudioStream.ring, vol);
-        _setVolume(AudioStream.notification, vol);
-        await docRef.update({'setRingVolume': FieldValue.delete()});
-    }
-     if (data.containsKey('setAlarmVolume')) {
-      final vol = (data['setAlarmVolume'] as num).toDouble();
-      _setVolume(AudioStream.alarm, vol);
-      await docRef.update({'setAlarmVolume': FieldValue.delete()});
-    }
-    if (data.containsKey('setMusicVolume')) {
-      final vol = (data['setMusicVolume'] as num).toDouble();
-      _setVolume(AudioStream.music, vol);
-      await docRef.update({'setMusicVolume': FieldValue.delete()});
-    }
-    if (data.containsKey('setNotificationVolume')) {
-      final vol = (data['setNotificationVolume'] as num).toDouble();
-      _setVolume(AudioStream.notification, vol);
-      await docRef.update({'setNotificationVolume': FieldValue.delete()});
-    }
-
-    if (data.containsKey('requestCallLog') && data['requestCallLog'] == true) {
-       await fetchAndUploadCallLog(deviceId);
-       await docRef.update({'requestCallLog': false});
-    }
-    if (data.containsKey('requestSmsLog') && data['requestSmsLog'] == true) {
-       await fetchAndUploadSmsLog(deviceId);
-       await docRef.update({'requestSmsLog': false});
-    }
-    if (data.containsKey('requestContacts') && data['requestContacts'] == true) {
-       await fetchAndUploadContacts(deviceId);
-       await docRef.update({'requestContacts': false});
-    }
-    if (data.containsKey('requestInstalledApps') && data['requestInstalledApps'] == true) {
-       await fetchAndUploadInstalledApps(deviceId);
-       await docRef.update({'requestInstalledApps': false});
-    }
-  });
+    _processFirestoreCommands(deviceId, data, docRef);
+  }, onError: (e) => print("Firestore Listener Error: $e"));
 
   await blockedAppsSubscription?.cancel();
-  blockedAppsSubscription = FirebaseFirestore.instance
-      .collection('child_devices').doc(deviceId)
-      .collection('blocked_apps').doc('list')
-      .snapshots().listen((snapshot) async {
-    final data = snapshot.data();
-    List<String> blockedPackages = List<String>.from(data?['blocked_packages'] ?? []);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('native_blocked_apps', blockedPackages.join(','));
-    print('--- Updated blocked apps ---');
+  blockedAppsSubscription = docRef
+      .collection('blocked_apps')
+      .doc('list')
+      .snapshots()
+      .listen((snapshot) async {
+        final data = snapshot.data();
+        List<String> blockedPackages = List<String>.from(
+          data?['blocked_packages'] ?? [],
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('native_blocked_apps', blockedPackages.join(','));
+        print('--- Updated blocked apps ---');
+      });
+
+  Timer.periodic(const Duration(seconds: 1), (timer) async {
+    if (isFindingDevice) return;
+    await _updateHeartbeat(deviceId);
   });
 
-   Timer.periodic(const Duration(seconds: 1), (timer) async {
-     if (isFindingDevice) return;
-     final currentDeviceId = await getDeviceId();
-     if (currentDeviceId == null) { timer.cancel(); return; }
-     final docRef = FirebaseFirestore.instance.collection('child_devices').doc(currentDeviceId);
-     final Map<String, dynamic> stats = {'lastUpdated': FieldValue.serverTimestamp()};
-     try {
-       final ringerStatus = await SoundMode.ringerModeStatus;
-       stats['ringerMode'] = ringerStatus.name;
-       stats['vol_ring'] = await FlutterVolumeController.getVolume(stream: AudioStream.ring) ?? 0.0;
-       stats['vol_alarm'] = await FlutterVolumeController.getVolume(stream: AudioStream.alarm) ?? 0.0;
-       stats['vol_music'] = await FlutterVolumeController.getVolume(stream: AudioStream.music) ?? 0.0;
-     } catch (_) {}
-     if (stats.length > 1) await docRef.update(stats);
-   });
+  Timer.periodic(const Duration(seconds: 15), (timer) async {
+    if (isFindingDevice) return;
+    await _updateVolumes(deviceId);
+  });
 
-   Timer.periodic(const Duration(seconds: 5), (timer) async {
-      final currentDeviceId = await getDeviceId();
-      if (currentDeviceId == null) { timer.cancel(); return; }
-      final docRef = FirebaseFirestore.instance.collection('child_devices').doc(currentDeviceId);
-      final Map<String, dynamic> stats = {};
+  Timer.periodic(const Duration(seconds: 5), (timer) async {
+    await _syncNotifications(deviceId);
+    await _syncWebHistory(deviceId);
+  });
+
+  Timer.periodic(const Duration(seconds: 15), (timer) async {
+    if (await Permission.locationAlways.isGranted) {
       try {
-        stats['batteryLevel'] = await Battery().batteryLevel;
-        final connectivityResult = await Connectivity().checkConnectivity();
-        String internetStatus = 'Offline';
-        String? wifiSsid;
-        if (connectivityResult.contains(ConnectivityResult.wifi)) {
-           internetStatus = 'WiFi';
-           try { wifiSsid = (await NetworkInfo().getWifiName())?.replaceAll('"', ''); } catch (_) {}
-        } else if (connectivityResult.contains(ConnectivityResult.mobile)) {
-           internetStatus = 'Mobile';
-        }
-        stats['internetStatus'] = internetStatus;
-        if (wifiSsid != null) stats['wifiSsid'] = wifiSsid;
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        await docRef.update({
+          'currentLocation': GeoPoint(pos.latitude, pos.longitude),
+          'locationLastUpdated': FieldValue.serverTimestamp(),
+        });
       } catch (_) {}
-      if (stats.isNotEmpty) await docRef.update(stats);
-   });
-
-  // --- 30-second Sync Timer ---
-  Timer.periodic(const Duration(seconds: 3), (timer) async {
-    final currentDeviceId = await getDeviceId();
-    if (currentDeviceId != null) {
-       await _syncNotifications(currentDeviceId);
-       await _syncWebHistory(currentDeviceId); 
-       await _syncClipboard(currentDeviceId);
     }
   });
 
-    Timer.periodic(const Duration(seconds: 5), (timer) async {
-        final currentDeviceId = await getDeviceId();
-        if (currentDeviceId == null) { timer.cancel(); return; }
-        final docRef = FirebaseFirestore.instance.collection('child_devices').doc(currentDeviceId);
-        if (await Permission.locationAlways.isGranted) {
-             final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
-             await docRef.update({
-                 'currentLocation': GeoPoint(pos.latitude, pos.longitude),
-                 'locationLastUpdated': FieldValue.serverTimestamp(),
-             });
-        }
-    });
-
-    Timer.periodic(const Duration(minutes: 5), (timer) async {
-         final currentDeviceId = await getDeviceId();
-         if (currentDeviceId == null) { timer.cancel(); return; }
-         final docRef = FirebaseFirestore.instance.collection('child_devices').doc(currentDeviceId);
-         if (await Permission.locationAlways.isGranted) {
-             final pos = await Geolocator.getCurrentPosition(desiredAccuracy: LocationAccuracy.best);
-             await docRef.collection('location_history').add({
-                 'location': GeoPoint(pos.latitude, pos.longitude),
-                 'timestamp': FieldValue.serverTimestamp(),
-             });
-        }
-    });
+  Timer.periodic(const Duration(minutes: 5), (timer) async {
+    if (await Permission.locationAlways.isGranted) {
+      try {
+        final pos = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        await docRef.collection('location_history').add({
+          'location': GeoPoint(pos.latitude, pos.longitude),
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      } catch (_) {}
+    }
+  });
 }
 
-// --- HELPER: Sync Clipboard ---
-Future<void> _syncClipboard(String deviceId) async {
-  final prefs = await SharedPreferences.getInstance();
-  await prefs.reload(); 
+Future<void> _pushVolumeAndRingerStatus(String deviceId) async {
+  try {
+    final ringerStatus = await SoundMode.ringerModeStatus;
 
-  final clipString = prefs.getString('native_clipboard_buffer');
+    final double volRing =
+        await FlutterVolumeController.getVolume(stream: AudioStream.ring) ??
+        0.0;
+    final double volAlarm =
+        await FlutterVolumeController.getVolume(stream: AudioStream.alarm) ??
+        0.0;
+    final double volMusic =
+        await FlutterVolumeController.getVolume(stream: AudioStream.music) ??
+        0.0;
 
-  if (clipString != null && clipString.isNotEmpty && clipString != "[]") {
-    try {
-      final List<dynamic> jsonList = jsonDecode(clipString);
-      
-      final docRef = FirebaseFirestore.instance.collection('child_devices').doc(deviceId);
-      final historyCollection = docRef.collection('clipboard_history');
-      final batch = FirebaseFirestore.instance.batch();
-
-      // 1. Update "Latest" field
-      if (jsonList.isNotEmpty) {
-        var lastItem = jsonList.last;
-        Map<String, dynamic> lastData;
-        if(lastItem is String) lastData = jsonDecode(lastItem);
-        else lastData = lastItem as Map<String, dynamic>;
-
-        batch.update(docRef, {
-          'clipboardText': lastData['text'],
-          'clipboardLastUpdated': Timestamp.now(),
+    await FirebaseFirestore.instance
+        .collection('child_devices')
+        .doc(deviceId)
+        .update({
+          'ringerMode': ringerStatus.name,
+          'vol_ring': volRing,
+          'vol_alarm': volAlarm,
+          'vol_music': volMusic,
         });
-      }
-
-      // 2. Add to History Collection with Unique ID
-      for (var item in jsonList) {
-         Map<String, dynamic> data;
-         if(item is String) data = jsonDecode(item);
-         else data = item as Map<String, dynamic>;
-
-         int ts = data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
-         data['timestamp'] = Timestamp.fromMillisecondsSinceEpoch(ts);
-         
-         String uniqueId = "${ts}_${data['text'].hashCode}";
-         batch.set(historyCollection.doc(uniqueId), data);
-      }
-
-      await batch.commit();
-      print("CLIPBOARD SYNC: Uploaded ${jsonList.length} clips.");
-
-      await prefs.setString('native_clipboard_buffer', "[]"); 
-      await prefs.reload();
-
-    } catch (e) {
-      print("CLIPBOARD SYNC ERROR: $e");
-    }
+  } catch (e) {
+    print("Error syncing volume/ringer: $e");
   }
 }
 
-// --- HELPER: Sync Web History ---
+Future<void> _updateVolumes(String deviceId) async {
+  final docRef = FirebaseFirestore.instance
+      .collection('child_devices')
+      .doc(deviceId);
+  final Map<String, dynamic> stats = {
+    'lastUpdated': FieldValue.serverTimestamp(),
+  };
+
+  if (stats.isNotEmpty) {
+    await docRef.update(stats).catchError((e) {});
+  }
+
+  await _pushVolumeAndRingerStatus(deviceId);
+}
+
+Future<void> _updateHeartbeat(String deviceId) async {
+  final docRef = FirebaseFirestore.instance
+      .collection('child_devices')
+      .doc(deviceId);
+  final Map<String, dynamic> stats = {
+    'lastUpdated': FieldValue.serverTimestamp(),
+  };
+
+  try {
+    stats['batteryLevel'] = await Battery().batteryLevel;
+    final connectivityResult = await Connectivity().checkConnectivity();
+    if (connectivityResult.contains(ConnectivityResult.wifi)) {
+      stats['internetStatus'] = 'WiFi';
+      try {
+        stats['wifiSsid'] = (await NetworkInfo().getWifiName())?.replaceAll(
+          '"',
+          '',
+        );
+      } catch (_) {}
+    } else if (connectivityResult.contains(ConnectivityResult.mobile)) {
+      stats['internetStatus'] = 'Mobile';
+    } else {
+      stats['internetStatus'] = 'Offline';
+    }
+  } catch (_) {}
+
+  if (stats.isNotEmpty) {
+    await docRef.update(stats).catchError((e) {});
+  }
+
+  await _pushVolumeAndRingerStatus(deviceId);
+}
+
+Future<void> _processFirestoreCommands(
+  String deviceId,
+  Map<String, dynamic> data,
+  DocumentReference docRef,
+) async {
+  if (data.containsKey('requestLock') && data['requestLock'] == true) {
+    print("🔒 LOCK REQUEST RECEIVED");
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('native_trigger_lock', true);
+    await docRef.update({'requestLock': false});
+  }
+
+  if (data.containsKey('requestAppUsage') && data['requestAppUsage'] == true) {
+    Future.wait([
+      fetchAndUploadTodayAppUsage(deviceId),
+      fetchAndUploadAppUsageForDuration(
+        deviceId,
+        const Duration(hours: 24),
+        'last_24h_stats',
+      ),
+      fetchAndUploadAppUsageForDuration(
+        deviceId,
+        const Duration(days: 30),
+        'last_30d_stats',
+      ),
+    ]).then((_) => docRef.update({'requestAppUsage': false}));
+  }
+
+  if (data.containsKey('requestScreenTimeReport') &&
+      data['requestScreenTimeReport'] == true) {
+    _fetchAndUploadDailyReports(
+      deviceId,
+    ).then((_) => docRef.update({'requestScreenTimeReport': false}));
+  }
+
+  if (data.containsKey('requestForceRing') &&
+      data['requestForceRing'] == true) {
+    try {
+      await SoundMode.setSoundMode(RingerModeStatus.normal);
+      await _pushVolumeAndRingerStatus(deviceId);
+    } catch (_) {}
+    await docRef.update({'requestForceRing': false});
+  }
+
+  if (data.containsKey('requestFindDevice') &&
+      data['requestFindDevice'] == true) {
+    await _performFindDevice(docRef, deviceId);
+    await docRef.update({'requestFindDevice': false});
+  }
+
+  bool volumeChanged = false;
+
+  if (data.containsKey('setRingerMode')) {
+    await _setRingerMode(docRef, data['setRingerMode']);
+    volumeChanged = true;
+  }
+
+  if (data.containsKey('setRingVolume')) {
+    final vol = (data['setRingVolume'] as num).toDouble();
+    await _setVolume(AudioStream.ring, vol);
+    await _setVolume(AudioStream.notification, vol);
+    await docRef.update({'setRingVolume': FieldValue.delete()});
+    volumeChanged = true;
+  }
+
+  if (data.containsKey('setAlarmVolume')) {
+    final vol = (data['setAlarmVolume'] as num).toDouble();
+    await _setVolume(AudioStream.alarm, vol);
+    await docRef.update({'setAlarmVolume': FieldValue.delete()});
+    volumeChanged = true;
+  }
+
+  if (data.containsKey('setMusicVolume')) {
+    final vol = (data['setMusicVolume'] as num).toDouble();
+    await _setVolume(AudioStream.music, vol);
+    await docRef.update({'setMusicVolume': FieldValue.delete()});
+    volumeChanged = true;
+  }
+
+  if (volumeChanged) {
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _pushVolumeAndRingerStatus(deviceId);
+    });
+  }
+
+  if (data.containsKey('requestCallLog') && data['requestCallLog'] == true) {
+    await fetchAndUploadCallLog(deviceId);
+    await docRef.update({'requestCallLog': false});
+  }
+  if (data.containsKey('requestSmsLog') && data['requestSmsLog'] == true) {
+    await fetchAndUploadSmsLog(deviceId);
+    await docRef.update({'requestSmsLog': false});
+  }
+  if (data.containsKey('requestContacts') && data['requestContacts'] == true) {
+    await fetchAndUploadContacts(deviceId);
+    await docRef.update({'requestContacts': false});
+  }
+  if (data.containsKey('requestInstalledApps') &&
+      data['requestInstalledApps'] == true) {
+    await fetchAndUploadInstalledApps(deviceId);
+    await docRef.update({'requestInstalledApps': false});
+  }
+}
+
+Future<void> _checkPendingCommands(String deviceId) async {
+  print("🔄 RE-SYNC: Checking for commands sent while offline...");
+  final docRef = FirebaseFirestore.instance
+      .collection('child_devices')
+      .doc(deviceId);
+
+  try {
+    DocumentSnapshot doc = await docRef.get(
+      const GetOptions(source: Source.server),
+    );
+
+    if (doc.exists && doc.data() != null) {
+      await _processFirestoreCommands(
+        deviceId,
+        doc.data() as Map<String, dynamic>,
+        docRef,
+      );
+    }
+  } catch (e) {
+    print("Error checking pending commands: $e");
+  }
+}
+
 Future<void> _syncWebHistory(String deviceId) async {
   final prefs = await SharedPreferences.getInstance();
-  await prefs.reload(); 
-
+  await prefs.reload();
   final webString = prefs.getString('native_web_buffer');
 
   if (webString != null && webString.isNotEmpty && webString != "[]") {
     try {
       final List<dynamic> jsonList = jsonDecode(webString);
-      
       final batch = FirebaseFirestore.instance.batch();
       final collection = FirebaseFirestore.instance
           .collection('child_devices')
@@ -403,42 +475,35 @@ Future<void> _syncWebHistory(String deviceId) async {
           .collection('web_history');
 
       for (var item in jsonList) {
-         Map<String, dynamic> data;
-         if(item is String) {
-           data = jsonDecode(item);
-         } else {
-           data = item as Map<String, dynamic>;
-         }
-         int ts = data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
-         data['timestamp'] = Timestamp.fromMillisecondsSinceEpoch(ts);
-         
-         String uniqueId = "${ts}_${data['url'].hashCode}";
-         final docRef = collection.doc(uniqueId); 
-         batch.set(docRef, data);
-      }
+        Map<String, dynamic> data;
+        if (item is String) {
+          data = jsonDecode(item);
+        } else {
+          data = item as Map<String, dynamic>;
+        }
+        int ts = data['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
+        data['timestamp'] = Timestamp.fromMillisecondsSinceEpoch(ts);
 
+        String uniqueId = "${ts}_${data['url'].hashCode}";
+        batch.set(collection.doc(uniqueId), data);
+      }
       await batch.commit();
       print("WEB SYNC: Uploaded ${jsonList.length} URLs.");
-
-      await prefs.setString('native_web_buffer', "[]"); 
-      await prefs.reload();
-
+      await prefs.setString('native_web_buffer', "[]");
     } catch (e) {
       print("WEB SYNC ERROR: $e");
     }
   }
 }
 
-// --- HELPER: Sync Notifications ---
 Future<void> _syncNotifications(String deviceId) async {
   final prefs = await SharedPreferences.getInstance();
-  await prefs.reload(); 
+  await prefs.reload();
   final notifString = prefs.getString('native_notification_buffer');
 
   if (notifString != null && notifString.isNotEmpty && notifString != "[]") {
     try {
       final List<dynamic> jsonList = jsonDecode(notifString);
-      
       final batch = FirebaseFirestore.instance.batch();
       final notifCollection = FirebaseFirestore.instance
           .collection('child_devices')
@@ -446,26 +511,23 @@ Future<void> _syncNotifications(String deviceId) async {
           .collection('notification_history');
 
       for (var item in jsonList) {
-         Map<String, dynamic> notifData;
-         if(item is String) {
-           notifData = jsonDecode(item);
-         } else {
-           notifData = item as Map<String, dynamic>;
-         }
-         int ts = notifData['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
-         notifData['timestamp'] = Timestamp.fromMillisecondsSinceEpoch(ts);
-         
-         String uniqueId = "${ts}_${notifData['packageName']}_${notifData['title'].hashCode}";
-         final docRef = notifCollection.doc(uniqueId); 
-         batch.set(docRef, notifData);
+        Map<String, dynamic> notifData;
+        if (item is String) {
+          notifData = jsonDecode(item);
+        } else {
+          notifData = item as Map<String, dynamic>;
+        }
+        int ts =
+            notifData['timestamp'] ?? DateTime.now().millisecondsSinceEpoch;
+        notifData['timestamp'] = Timestamp.fromMillisecondsSinceEpoch(ts);
+
+        String uniqueId =
+            "${ts}_${notifData['packageName']}_${notifData['title'].hashCode}";
+        batch.set(notifCollection.doc(uniqueId), notifData);
       }
-
       await batch.commit();
-      print("NOTIF SYNC: Successfully uploaded ${jsonList.length} notifications.");
-
-      await prefs.setString('native_notification_buffer', "[]"); 
-      await prefs.reload();
-
+      print("NOTIF SYNC: Uploaded ${jsonList.length} notifications.");
+      await prefs.setString('native_notification_buffer', "[]");
     } catch (e) {
       print("NOTIF SYNC ERROR: $e");
     }
@@ -476,14 +538,11 @@ Future<void> fetchAndUploadInstalledApps(String deviceId) async {
   final docRef = FirebaseFirestore.instance
       .collection('child_devices')
       .doc(deviceId);
-  print('INSTALLED APPS FETCH: Received request.');
   try {
     List<AppInfo> installedApps = await InstalledApps.getInstalledApps(
       excludeSystemApps: true,
       withIcon: true,
     );
-
-    print('INSTALLED APPS FETCH: Found ${installedApps.length} apps.');
     List<Map<String, dynamic>> appsData = [];
     for (var app in installedApps) {
       appsData.add({
@@ -497,10 +556,9 @@ Future<void> fetchAndUploadInstalledApps(String deviceId) async {
       'updatedAt': FieldValue.serverTimestamp(),
       'apps': appsData,
     });
-    print('INSTALLED APPS FETCH: Upload complete.');
     await docRef.update({'requestInstalledApps': false});
   } catch (e) {
-    print('INSTALLED APPS FETCH ERROR: ${e.toString()}');
+    print('INSTALLED APPS ERROR: $e');
     await docRef.update({'requestInstalledApps': false});
   }
 }
@@ -509,10 +567,8 @@ Future<void> fetchAndUploadContacts(String deviceId) async {
   final docRef = FirebaseFirestore.instance
       .collection('child_devices')
       .doc(deviceId);
-  print('CONTACTS FETCH: Received request.');
   try {
-    var contactsPermission = await Permission.contacts.status;
-    if (contactsPermission.isGranted) {
+    if (await Permission.contacts.isGranted) {
       List<Contact> contacts = await FlutterContacts.getContacts(
         withProperties: true,
         withAccounts: true,
@@ -530,135 +586,79 @@ Future<void> fetchAndUploadContacts(String deviceId) async {
         'updatedAt': FieldValue.serverTimestamp(),
         'entries': contactsData,
       });
-    } else {
-      print('CONTACTS FETCH ERROR: Permission was not granted.');
     }
     await docRef.update({'requestContacts': false});
   } catch (e) {
-    print('CONTACTS FETCH ERROR: ${e.toString()}');
+    print('CONTACTS ERROR: $e');
     await docRef.update({'requestContacts': false});
   }
 }
 
-Future<void> _performFindDevice(DocumentReference docRef) async {
+Future<void> _performFindDevice(
+  DocumentReference docRef,
+  String? deviceId,
+) async {
   if (isFindingDevice) return;
   isFindingDevice = true;
-
   try {
     await SoundMode.setSoundMode(RingerModeStatus.normal);
-    await docRef.update({'ringerMode': RingerModeStatus.normal.name});
-    print("--- Find My Device: Ringer set to NORMAL ---");
-
     await FlutterVolumeController.setVolume(1.0, stream: AudioStream.alarm);
     await FlutterVolumeController.setVolume(1.0, stream: AudioStream.ring);
-    print("--- Find My Device: Alarm & Ring Volume set to MAX ---");
+
+    if (deviceId != null) {
+      await _pushVolumeAndRingerStatus(deviceId);
+    }
 
     FlutterRingtonePlayer().playAlarm(looping: true);
-    print("--- Find My Device: PLAYING ALARM ---");
-
     await Future.delayed(const Duration(seconds: 15));
     await FlutterRingtonePlayer().stop();
-    print("--- Find My Device: Alarm stopped ---");
-  } on PlatformException catch (e) {
-    print("--- ERROR during Find My Device: $e ---");
-    print(
-      "--- THIS LIKELY FAILED. THE APP NEEDS 'DO NOT DISTURB ACCESS' PERMISSION ON THE CHILD'S PHONE. ---",
-    );
   } catch (e) {
-    print("--- An unknown error occurred during Find My Device: $e ---");
+    print("Find Device Error: $e");
   }
-
   isFindingDevice = false;
 }
 
 Future<void> _setRingerMode(DocumentReference docRef, String mode) async {
-  RingerModeStatus status;
-
-  if (mode == "vibrate") {
+  RingerModeStatus status = RingerModeStatus.normal;
+  if (mode == "vibrate")
     status = RingerModeStatus.vibrate;
-  } else if (mode == "silent") {
+  else if (mode == "silent")
     status = RingerModeStatus.silent;
-  } else {
-    status = RingerModeStatus.normal;
-  }
 
   try {
     await SoundMode.setSoundMode(status);
-    print("--- Ringer mode successfully set to $mode ---");
-    await docRef.update({'ringerMode': status.name});
-  } on PlatformException catch (e) {
-    print("--- ERROR SETTING RINGER MODE: $e ---");
-    print(
-      "--- THIS LIKELY FAILED. THE APP NEEDS 'DO NOT DISTURB ACCESS' PERMISSION ON THE CHILD'S PHONE. ---",
-    );
   } catch (e) {
-    print("--- An unknown error occurred: $e ---");
+    print("Ringer Mode Error: $e");
   }
-
   await docRef.update({'setRingerMode': FieldValue.delete()});
 }
 
 Future<void> _setVolume(AudioStream stream, double volume) async {
   try {
-    final safeVolume = volume.clamp(0.0, 1.0);
-    await FlutterVolumeController.setVolume(safeVolume, stream: stream);
-  } catch (e) {
-    print("--- Error setting volume for $stream: $e ---");
-  }
+    await FlutterVolumeController.setVolume(
+      volume.clamp(0.0, 1.0),
+      stream: stream,
+    );
+  } catch (_) {}
 }
 
 Future<void> fetchAndUploadTodayAppUsage(String deviceId) async {
   final docRef = FirebaseFirestore.instance
       .collection('child_devices')
       .doc(deviceId);
-  print('APP USAGE FETCH (Today)');
   try {
     DateTime now = DateTime.now();
     DateTime startDate = DateTime(now.year, now.month, now.day);
     List<AppUsageInfo> usageList = await AppUsage().getAppUsage(startDate, now);
-    Map<String, Duration> aggregatedUsage = {};
-    Map<String, DateTime> lastForegroundMap = {};
-    for (var info in usageList) {
-      if (info.usage.inMinutes > 0) {
-        aggregatedUsage.update(
-          info.packageName,
-          (v) => v + info.usage,
-          ifAbsent: () => info.usage,
-        );
-        lastForegroundMap.update(
-          info.packageName,
-          (v) => info.lastForeground.isAfter(v) ? info.lastForeground : v,
-          ifAbsent: () => info.lastForeground,
-        );
-      }
-    }
-
-    List<AppInfo> installedApps = await InstalledApps.getInstalledApps(
-      excludeSystemApps: false,
-      withIcon: false,
+    await _processAndUploadUsage(
+      docRef,
+      'today_stats',
+      usageList,
+      startDate,
+      now,
     );
-
-    Map<String, String> appNames = {
-      for (var app in installedApps) app.packageName: app.name,
-    };
-    List<Map<String, dynamic>> appData = [];
-    aggregatedUsage.forEach((pkg, dur) {
-      appData.add({
-        'appName': appNames[pkg] ?? pkg,
-        'packageName': pkg,
-        'totalUsageMinutes': dur.inMinutes,
-        'lastForeground': lastForegroundMap[pkg]?.toIso8601String(),
-      });
-    });
-    await docRef.collection('app_usage').doc('today_stats').set({
-      'updatedAt': FieldValue.serverTimestamp(),
-      'startDate': startDate.toIso8601String(),
-      'endDate': now.toIso8601String(),
-      'apps': appData,
-    });
-    print('APP USAGE FETCH (Today): Upload complete.');
   } catch (e) {
-    print('APP USAGE FETCH (Today) ERROR: $e');
+    print('APP USAGE TODAY ERROR: $e');
   }
 }
 
@@ -670,7 +670,6 @@ Future<void> fetchAndUploadAppUsageForDuration(
   final docRef = FirebaseFirestore.instance
       .collection('child_devices')
       .doc(deviceId);
-  print('APP USAGE FETCH ($docName): Duration $duration');
   try {
     DateTime endDate = DateTime.now();
     DateTime startDate = endDate.subtract(duration);
@@ -678,68 +677,76 @@ Future<void> fetchAndUploadAppUsageForDuration(
       startDate,
       endDate,
     );
-    Map<String, Duration> aggregatedUsage = {};
-    Map<String, DateTime> lastForegroundMap = {};
-    for (var info in usageList) {
-      if (info.usage.inMinutes > 0) {
-        aggregatedUsage.update(
-          info.packageName,
-          (v) => v + info.usage,
-          ifAbsent: () => info.usage,
-        );
-        lastForegroundMap.update(
-          info.packageName,
-          (v) => info.lastForeground.isAfter(v) ? info.lastForeground : v,
-          ifAbsent: () => info.lastForeground,
-        );
-      }
-    }
-
-    List<AppInfo> installedApps = await InstalledApps.getInstalledApps(
-      excludeSystemApps: false,
-      withIcon: false,
+    await _processAndUploadUsage(
+      docRef,
+      docName,
+      usageList,
+      startDate,
+      endDate,
     );
-
-    Map<String, String> appNames = {
-      for (var app in installedApps) app.packageName: app.name,
-    };
-    List<Map<String, dynamic>> appData = [];
-    aggregatedUsage.forEach((pkg, dur) {
-      appData.add({
-        'appName': appNames[pkg] ?? pkg,
-        'packageName': pkg,
-        'totalUsageMinutes': dur.inMinutes,
-        'lastForeground': lastForegroundMap[pkg]?.toIso8601String(),
-      });
-    });
-    await docRef.collection('app_usage').doc(docName).set({
-      'updatedAt': FieldValue.serverTimestamp(),
-      'startDate': startDate.toIso8601String(),
-      'endDate': endDate.toIso8601String(),
-      'apps': appData,
-    });
-    print('APP USAGE FETCH ($docName): Upload complete.');
   } catch (e) {
-    print('APP USAGE FETCH ($docName) ERROR: $e');
+    print('APP USAGE $docName ERROR: $e');
   }
 }
 
+Future<void> _processAndUploadUsage(
+  DocumentReference docRef,
+  String docId,
+  List<AppUsageInfo> usageList,
+  DateTime start,
+  DateTime end,
+) async {
+  Map<String, Duration> aggregatedUsage = {};
+  Map<String, DateTime> lastForegroundMap = {};
+
+  for (var info in usageList) {
+    if (info.usage.inMinutes > 0) {
+      aggregatedUsage.update(
+        info.packageName,
+        (v) => v + info.usage,
+        ifAbsent: () => info.usage,
+      );
+      lastForegroundMap.update(
+        info.packageName,
+        (v) => info.lastForeground.isAfter(v) ? info.lastForeground : v,
+        ifAbsent: () => info.lastForeground,
+      );
+    }
+  }
+
+  List<AppInfo> installedApps = await InstalledApps.getInstalledApps();
+  Map<String, String> appNames = {
+    for (var app in installedApps) app.packageName: app.name,
+  };
+
+  List<Map<String, dynamic>> appData = [];
+  aggregatedUsage.forEach((pkg, dur) {
+    appData.add({
+      'appName': appNames[pkg] ?? pkg,
+      'packageName': pkg,
+      'totalUsageMinutes': dur.inMinutes,
+      'lastForeground': lastForegroundMap[pkg]?.toIso8601String(),
+    });
+  });
+
+  await docRef.collection('app_usage').doc(docId).set({
+    'updatedAt': FieldValue.serverTimestamp(),
+    'startDate': start.toIso8601String(),
+    'endDate': end.toIso8601String(),
+    'apps': appData,
+  });
+}
+
 Future<void> _fetchAndUploadDailyReports(String deviceId) async {
-  print('DAILY REPORT (On-Demand): Starting 30-day loop...');
   final DateTime now = DateTime.now();
   List<Map<String, dynamic>> dailyReports = [];
-
   try {
     for (int i = 0; i < 30; i++) {
       final DateTime dayToQuery = now.subtract(Duration(days: i));
-
       final DateTime startTime = DateTime(
         dayToQuery.year,
         dayToQuery.month,
         dayToQuery.day,
-        0,
-        0,
-        0,
       );
       final DateTime endTime = DateTime(
         dayToQuery.year,
@@ -749,21 +756,21 @@ Future<void> _fetchAndUploadDailyReports(String deviceId) async {
         59,
         59,
       );
-      final String dateString = DateFormat('yyyy-MM-dd').format(startTime);
 
       final List<AppUsageInfo> usageList = await AppUsage().getAppUsage(
         startTime,
         endTime,
       );
+      int totalMinutes = usageList.fold(
+        0,
+        (sum, item) => sum + item.usage.inMinutes,
+      );
 
-      int totalMinutes = 0;
-      for (var info in usageList) {
-        totalMinutes += info.usage.inMinutes;
-      }
-
-      dailyReports.add({'date': dateString, 'totalUsageMinutes': totalMinutes});
+      dailyReports.add({
+        'date': DateFormat('yyyy-MM-dd').format(startTime),
+        'totalUsageMinutes': totalMinutes,
+      });
     }
-
     await FirebaseFirestore.instance
         .collection('child_devices')
         .doc(deviceId)
@@ -773,49 +780,29 @@ Future<void> _fetchAndUploadDailyReports(String deviceId) async {
           'reports': dailyReports,
           'updatedAt': FieldValue.serverTimestamp(),
         });
-
-    print('DAILY REPORT (On-Demand): Upload complete.');
   } catch (e) {
-    print('DAILY REPORT (On-Demand) ERROR: $e');
+    print('DAILY REPORT ERROR: $e');
   }
 }
 
 Future<void> fetchAndUploadSmsLog(String deviceId) async {
-  final SmsQuery query = SmsQuery();
   final docRef = FirebaseFirestore.instance
       .collection('child_devices')
       .doc(deviceId);
   try {
-    var smsPermission = await Permission.sms.status;
-    var contactsPermission = await Permission.contacts.status;
-    Map<String, String> contactsMap = {};
-    if (contactsPermission.isGranted) {
-      List<Contact> contacts = await FlutterContacts.getContacts(
-        withProperties: true,
-      );
-      for (var contact in contacts) {
-        for (var phone in contact.phones) {
-          String normalizedNumber = _normalizePhoneNumber(phone.number);
-          if (normalizedNumber.isNotEmpty) {
-            contactsMap[normalizedNumber] = contact.displayName;
-          }
-        }
-      }
-    }
-    if (smsPermission.isGranted) {
+    if (await Permission.sms.isGranted) {
+      final SmsQuery query = SmsQuery();
       List<SmsMessage> messages = await query.querySms(
         kinds: [SmsQueryKind.inbox, SmsQueryKind.sent],
       );
       List<Map<String, dynamic>> smsLogData = [];
-      for (var message in messages) {
-        if (message.address == null) continue;
-        String normalizedAddress = _normalizePhoneNumber(message.address!);
+      final limitedMessages = messages.take(50);
+      for (var message in limitedMessages) {
         smsLogData.add({
-          'name': contactsMap[normalizedAddress],
           'address': message.address,
           'body': message.body,
-          'kind': message.kind?.name,
           'date': message.date,
+          'kind': message.kind?.name,
         });
       }
       await docRef.collection('sms_log').doc('history').set({
@@ -825,7 +812,7 @@ Future<void> fetchAndUploadSmsLog(String deviceId) async {
     }
     await docRef.update({'requestSmsLog': false});
   } catch (e) {
-    print('SMS LOG FETCH ERROR: ${e.toString()}');
+    print('SMS LOG ERROR: $e');
     await docRef.update({'requestSmsLog': false});
   }
 }
@@ -837,7 +824,8 @@ Future<void> fetchAndUploadCallLog(String deviceId) async {
   try {
     Iterable<CallLogEntry> entries = await CallLog.get();
     List<Map<String, dynamic>> callLogData = [];
-    for (var entry in entries) {
+    final limitedEntries = entries.take(50);
+    for (var entry in limitedEntries) {
       callLogData.add({
         'name': entry.name,
         'number': entry.number,
@@ -854,7 +842,7 @@ Future<void> fetchAndUploadCallLog(String deviceId) async {
     });
     await docRef.update({'requestCallLog': false});
   } catch (e) {
-    print('CALL LOG FETCH ERROR: ${e.toString()}');
+    print('CALL LOG ERROR: $e');
     await docRef.update({'requestCallLog': false});
   }
 }

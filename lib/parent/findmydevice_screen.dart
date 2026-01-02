@@ -30,7 +30,6 @@ class _FindMyDeviceScreenState extends State<FindMyDeviceScreen> {
     try {
       _docRef.update({'requestFindDevice': true});
     } catch (e) {
-      print("Failed to send Find My Device request: $e");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Failed to send request: $e')),
@@ -42,8 +41,23 @@ class _FindMyDeviceScreenState extends State<FindMyDeviceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text('Find My Device'),
+        elevation: 0,
+        backgroundColor: Colors.white,
+        centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20, color: Colors.black87),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text(
+          'Find My Device',
+          style: TextStyle(
+            color: Colors.black87,
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
       body: StreamBuilder<DocumentSnapshot>(
         stream: _docRef.snapshots(),
@@ -54,64 +68,133 @@ class _FindMyDeviceScreenState extends State<FindMyDeviceScreen> {
             isFinding = data['requestFindDevice'] ?? false;
           }
 
-          return Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Icon(
-                  isFinding ? Icons.vibration_rounded : Icons.spatial_audio_rounded,
-                  size: 150,
-                  color: isFinding ? Colors.blue : Colors.grey[700],
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  isFinding ? 'Ringing ${widget.deviceName}...' : 'Find ${widget.deviceName}',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 32.0),
+              child: Column(
+                children: [
+                  const Spacer(),
+                  Container(
+                    width: 240,
+                    height: 240,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isFinding
+                          ? const Color(0xFF5C6BC0).withOpacity(0.1)
+                          : Colors.white,
+                      border: Border.all(
+                        color: isFinding
+                            ? const Color(0xFF5C6BC0).withOpacity(0.3)
+                            : Colors.transparent,
+                        width: 1,
                       ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'This will make the child\'s device ring at full volume for 15 seconds, even if it is on silent.',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.grey[600],
+                      boxShadow: [
+                        if (!isFinding)
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 20,
+                            offset: const Offset(0, 10),
+                          ),
+                        if (isFinding)
+                          BoxShadow(
+                            color: const Color(0xFF5C6BC0).withOpacity(0.2),
+                            blurRadius: 40,
+                            spreadRadius: 10,
+                          ),
+                      ],
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 180,
+                        height: 180,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isFinding ? const Color(0xFF5C6BC0) : Colors.grey[50],
+                        ),
+                        child: Icon(
+                          isFinding ? Icons.notifications_active : Icons.notifications_none,
+                          size: 80,
+                          color: isFinding ? Colors.white : Colors.grey[400],
+                        ),
                       ),
-                ),
-                const SizedBox(height: 40),
-                ElevatedButton(
-                  onPressed: isFinding ? null : _requestFindDevice,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    backgroundColor: isFinding ? Colors.grey : Colors.blue,
-                    foregroundColor: Colors.white,
-                    textStyle: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                  child: isFinding
-                      ? const Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 3,
+                  const SizedBox(height: 48),
+                  Text(
+                    isFinding ? 'Ringing ${widget.deviceName}...' : 'Find ${widget.deviceName}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                    child: Text(
+                      'This will make the child\'s device ring at full volume for 15 seconds, even if it is on silent.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 15,
+                        color: Colors.grey[600],
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      onPressed: isFinding ? null : _requestFindDevice,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF5C6BC0),
+                        disabledBackgroundColor: Colors.grey[300],
+                        foregroundColor: Colors.white,
+                        elevation: isFinding ? 0 : 4,
+                        shadowColor: const Color(0xFF5C6BC0).withOpacity(0.4),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: isFinding
+                          ? const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 2.5,
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Text(
+                                  'SENDING ALERT...',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                    letterSpacing: 1,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : const Text(
+                              'PLAY SOUND',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                letterSpacing: 1,
                               ),
                             ),
-                            SizedBox(width: 24),
-                            Text('RINGING...'),
-                          ],
-                        )
-                      : const Text('RING DEVICE'),
-                ),
-              ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
             ),
           );
         },
