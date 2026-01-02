@@ -37,6 +37,7 @@ bool isSosTriggered = false;
 bool isFindingDevice = false;
 DateTime _lastVolumeUpdate = DateTime.now();
 const int _volumeUpdateIntervalMs = 500;
+
 String _normalizePhoneNumber(String number) {
   String digitsOnly = number.replaceAll(RegExp(r'\D'), '');
   if (digitsOnly.length > 10) {

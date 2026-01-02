@@ -14,7 +14,6 @@ class AppBlockerService : AccessibilityService() {
     
     private lateinit var appBlockerManager: AppBlockerManager
     private lateinit var webHistoryManager: WebHistoryManager
-    private lateinit var clipboardMonitorManager: ClipboardMonitorManager 
 
     private val PREFS_NAME = "FlutterSharedPreferences"
     private val LOCK_TRIGGER_KEY = "flutter.native_trigger_lock"
@@ -36,7 +35,6 @@ class AppBlockerService : AccessibilityService() {
         
         appBlockerManager = AppBlockerManager(this)
         webHistoryManager = WebHistoryManager(this)
-        clipboardMonitorManager = ClipboardMonitorManager(this)
 
         val info = AccessibilityServiceInfo()
         
@@ -82,11 +80,6 @@ class AppBlockerService : AccessibilityService() {
         }
 
         try {
-            clipboardMonitorManager.checkClipboard()
-        } catch (e: Exception) {
-        }
-
-        try {
             webHistoryManager.processEvent(packageName, rootInActiveWindow)
         } catch (e: Exception) {
         }
@@ -98,9 +91,7 @@ class AppBlockerService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        try {
-            clipboardMonitorManager.cleanup()
-            
+        try {            
             val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
 
