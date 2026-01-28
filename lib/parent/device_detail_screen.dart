@@ -48,16 +48,24 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     }
   }
 
-  Future<void> _sendLockCommand() async {
+  // --- UPDATED LOGIC: Toggle Lock ---
+  Future<void> _toggleDeviceLock(bool isLocked) async {
     try {
       await FirebaseFirestore.instance
           .collection('child_devices')
           .doc(widget.deviceId)
-          .update({'requestLock': true});
+          .update({
+            'isForceLocked': isLocked, // true = Permanent Lock, false = Unlock
+            // We also send a timestamp so the child device knows it's a new command
+            'lastLockCommand': FieldValue.serverTimestamp(), 
+          });
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lock command sent!')),
+          SnackBar(
+            content: Text(isLocked ? 'Device Locked Permanently' : 'Device Unlocked'),
+            backgroundColor: isLocked ? Colors.red : Colors.green,
+          ),
         );
       }
     } catch (e) {
@@ -68,11 +76,12 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       }
     }
   }
+  // ----------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA), 
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
         elevation: 0,
         centerTitle: true,
@@ -110,9 +119,12 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
           final bool isFetchingCallLog = data['requestCallLog'] ?? false;
           final bool isFetchingSmsLog = data['requestSmsLog'] ?? false;
           final bool isFetchingContacts = data['requestContacts'] ?? false;
-          final bool isFetchingInstalledApps =
-              data['requestInstalledApps'] ?? false;
+          final bool isFetchingInstalledApps = data['requestInstalledApps'] ?? false;
           final bool isFinding = data['requestFindDevice'] ?? false;
+
+          // --- NEW: Read Lock Status ---
+          final bool isForceLocked = data['isForceLocked'] ?? false;
+          // ----------------------------
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -151,7 +163,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                 subtitle: 'Restrict access to apps',
                 icon: Icons.block_flipped,
                 iconColor: Colors.redAccent,
-                isLoading: false, 
+                isLoading: false,
                 onRefresh: null,
                 onTap: () => _navTo(
                   AppBlockerScreen(
@@ -228,9 +240,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                 icon: Icons.spatial_audio_rounded,
                 iconColor: Colors.indigo,
                 isLoading: isFinding,
-                onRefresh: null, 
+                onRefresh: null,
                 onTap: isFinding
-                    ? () {} 
+                    ? () {}
                     : () => _navTo(
                           FindMyDeviceScreen(
                             deviceId: widget.deviceId,
@@ -297,40 +309,65 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                   ),
                 ),
               ),
-              
+
               const SizedBox(height: 12),
+              
+              // --- UPDATED UI: TOGGLE SWITCH FOR LOCK ---
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  // Change color based on lock state
+                  color: isForceLocked ? Colors.red.withOpacity(0.15) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.red.withOpacity(0.3)),
+                  border: Border.all(
+                    color: isForceLocked ? Colors.red : Colors.grey.withOpacity(0.2),
+                    width: 1.5
+                  ),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black12,
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  leading: Container(
+                child: SwitchListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  secondary: Container(
                     padding: const EdgeInsets.all(10),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
+                    decoration: BoxDecoration(
+                      color: isForceLocked ? Colors.red : Colors.grey.shade200,
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.lock_rounded, color: Colors.red),
-                  ),
-                  title: const Text(
-                    "Remote Lock",
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
+                    child: Icon(
+                      isForceLocked ? Icons.lock : Icons.lock_open,
+                      color: isForceLocked ? Colors.white : Colors.grey.shade700,
                     ),
                   ),
-                  subtitle: const Text(
-                    "Instantly lock child's screen",
-                    style: TextStyle(fontSize: 12),
+                  title: Text(
+                    isForceLocked ? "Device Locked" : "Device Unlocked",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: isForceLocked ? Colors.red : Colors.black87,
+                    ),
                   ),
-                  trailing: const Icon(Icons.chevron_right, color: Colors.red),
-                  onTap: _sendLockCommand,
+                  subtitle: Text(
+                    isForceLocked 
+                      ? "Child cannot use device" 
+                      : "Normal usage allowed",
+                    style: TextStyle(
+                      fontSize: 12, 
+                      color: isForceLocked ? Colors.red.shade700 : Colors.grey
+                    ),
+                  ),
+                  activeColor: Colors.red,
+                  value: isForceLocked,
+                  onChanged: (bool value) {
+                    _toggleDeviceLock(value);
+                  },
                 ),
               ),
+              // ------------------------------------------
+
               const SizedBox(height: 40),
             ],
           );
@@ -366,7 +403,7 @@ class _FeatureTile extends StatefulWidget {
   final String title;
   final String subtitle;
   final IconData icon;
-  final Color iconColor; 
+  final Color iconColor;
 
   final bool isLoading;
   final VoidCallback onTap;
@@ -376,7 +413,7 @@ class _FeatureTile extends StatefulWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
-    this.iconColor = Colors.blue, 
+    this.iconColor = Colors.blue,
     required this.isLoading,
     required this.onTap,
     this.onRefresh,
@@ -471,21 +508,20 @@ class __FeatureTileState extends State<_FeatureTile> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: widget.isLoading 
-                            ? Colors.grey.shade100
-                            : widget.iconColor.withOpacity(0.1),
+                          color: widget.isLoading
+                              ? Colors.grey.shade100
+                              : widget.iconColor.withOpacity(0.1),
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           widget.icon,
-                          color: widget.isLoading 
-                            ? Colors.grey 
-                            : widget.iconColor,
+                          color: widget.isLoading
+                              ? Colors.grey
+                              : widget.iconColor,
                           size: 24,
                         ),
                       ),
                       const SizedBox(width: 16),
-                      
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -495,15 +531,15 @@ class __FeatureTileState extends State<_FeatureTile> {
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
-                                color: widget.isLoading 
-                                    ? Colors.grey 
+                                color: widget.isLoading
+                                    ? Colors.grey
                                     : const Color(0xFF2D3436),
                               ),
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              widget.isLoading 
-                                  ? "Syncing data..." 
+                              widget.isLoading
+                                  ? "Syncing data..."
                                   : widget.subtitle,
                               style: TextStyle(
                                 fontSize: 12,
@@ -513,7 +549,6 @@ class __FeatureTileState extends State<_FeatureTile> {
                           ],
                         ),
                       ),
-
                       if (widget.isLoading)
                         const SizedBox(
                           width: 20,
@@ -535,7 +570,6 @@ class __FeatureTileState extends State<_FeatureTile> {
                       ],
                     ],
                   ),
-
                   if (widget.isLoading) ...[
                     const SizedBox(height: 16),
                     ClipRRect(

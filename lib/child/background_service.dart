@@ -214,7 +214,7 @@ void onStart(ServiceInstance service) async {
         print('--- Updated blocked apps ---');
       });
 
-  Timer.periodic(const Duration(seconds: 1), (timer) async {
+  Timer.periodic(const Duration(seconds: 15), (timer) async {
     if (isFindingDevice) return;
     await _updateHeartbeat(deviceId);
   });
@@ -339,11 +339,33 @@ Future<void> _processFirestoreCommands(
   Map<String, dynamic> data,
   DocumentReference docRef,
 ) async {
+  final prefs = await SharedPreferences.getInstance();
+
+  // ---------------------------------------------------------
+  // 1. NEW LOGIC: Handle Persistent Lock Toggle (isForceLocked)
+  // ---------------------------------------------------------
+  if (data.containsKey('isForceLocked')) {
+    bool serverLockState = data['isForceLocked'] == true;
+    bool currentLocalState = prefs.getBool('native_trigger_lock') ?? false;
+
+    // Only update if the state is different to avoid unnecessary writes
+    if (serverLockState != currentLocalState) {
+      await prefs.setBool('native_trigger_lock', serverLockState);
+      print("🔒 LOCK STATUS UPDATED: $serverLockState");
+      
+      // Optional: If you have a MethodChannel to force the UI immediately, call it here.
+      // Otherwise, your native code monitoring 'native_trigger_lock' will pick it up.
+    }
+  }
+
+  // ---------------------------------------------------------
+  // 2. OLD LOGIC: Keep this for backward compatibility if needed
+  // ---------------------------------------------------------
   if (data.containsKey('requestLock') && data['requestLock'] == true) {
-    print("🔒 LOCK REQUEST RECEIVED");
-    final prefs = await SharedPreferences.getInstance();
+    print("🔒 LEGACY LOCK REQUEST RECEIVED");
     await prefs.setBool('native_trigger_lock', true);
-    await docRef.update({'requestLock': false});
+    // We also update the persistent state to true to keep things in sync
+    await docRef.update({'requestLock': false, 'isForceLocked': true});
   }
 
   if (data.containsKey('requestAppUsage') && data['requestAppUsage'] == true) {

@@ -28,8 +28,13 @@ class _PermissionScreenState extends State<PermissionScreen>
   bool _isBatteryOptimizationDisabled = false;
   bool _isDndAccessGranted = false;
   bool _isNotificationListenerGranted = false;
-  static const MethodChannel _notificationChannel = MethodChannel(
-    'com.orbitshield.app/notifications',
+  bool _isAccessibilityGranted = false;
+
+  // 1. NEW: Variable for System Alert Window
+  bool _isOverlayGranted = false;
+
+  static const MethodChannel _nativeChannel = MethodChannel(
+    'com.orbitshield.app/native',
   );
 
   @override
@@ -62,35 +67,49 @@ class _PermissionScreenState extends State<PermissionScreen>
     final isGpsEnabled = await Geolocator.isLocationServiceEnabled();
     final isBatteryOptDisabled =
         await DisableBatteryOptimization.isBatteryOptimizationDisabled;
-
     final isDndGranted =
         await DndPermission.PermissionHandler.permissionsGranted;
 
+    // 2. NEW: Check Overlay Status
+    final overlayStatus = await Permission.systemAlertWindow.status;
+
     bool isNotifListenerGranted = false;
+    bool isAccessServiceGranted = false;
+
     if (Platform.isAndroid) {
       try {
-        isNotifListenerGranted = await _notificationChannel.invokeMethod(
-          'isPermissionGranted',
+        isNotifListenerGranted = await _nativeChannel.invokeMethod(
+          'checkNotificationPermission',
+        );
+        isAccessServiceGranted = await _nativeChannel.invokeMethod(
+          'checkAccessibilityPermission',
         );
       } catch (e) {
-        print("Error checking notification permission: $e");
+        print("Native Bridge Error: $e");
       }
     }
 
-    setState(() {
-      _isCameraGranted = cameraStatus.isGranted;
-      _isCallLogGranted = callLogStatus.isGranted;
-      _isSmsGranted = smsStatus.isGranted;
-      _isContactsGranted = contactsStatus.isGranted;
-      _isLocationGranted = locationStatus.isGranted;
-      _isBackgroundLocationGranted = backgroundLocationStatus.isGranted;
-      _isGpsEnabled = isGpsEnabled;
-      _isBatteryOptimizationDisabled = isBatteryOptDisabled ?? false;
-      _isDndAccessGranted = isDndGranted!;
-      _isNotificationListenerGranted = isNotifListenerGranted;
-    });
+    if (mounted) {
+      setState(() {
+        _isCameraGranted = cameraStatus.isGranted;
+        _isCallLogGranted = callLogStatus.isGranted;
+        _isSmsGranted = smsStatus.isGranted;
+        _isContactsGranted = contactsStatus.isGranted;
+        _isLocationGranted = locationStatus.isGranted;
+        _isBackgroundLocationGranted = backgroundLocationStatus.isGranted;
+        _isGpsEnabled = isGpsEnabled;
+        _isBatteryOptimizationDisabled = isBatteryOptDisabled ?? false;
+        _isDndAccessGranted = isDndGranted ?? false;
+        _isNotificationListenerGranted = isNotifListenerGranted;
+        _isAccessibilityGranted = isAccessServiceGranted;
+        
+        // 3. NEW: Update Overlay State
+        _isOverlayGranted = overlayStatus.isGranted;
+      });
+    }
   }
 
+  // ... Existing request methods ...
   Future<void> _requestCameraPermission() async {
     await Permission.camera.request();
     _checkAllPermissions();
@@ -127,7 +146,7 @@ class _PermissionScreenState extends State<PermissionScreen>
 
   Future<void> _openUsageSettings() async {
     AppUsage().getAppUsage(
-      DateTime.now().subtract(const Duration(days: 1)),
+      DateTime.now().subtract(const Duration(hours: 1)),
       DateTime.now(),
     );
   }
@@ -144,27 +163,77 @@ class _PermissionScreenState extends State<PermissionScreen>
     await DndPermission.PermissionHandler.openDoNotDisturbSetting();
   }
 
-  Future<void> _openAccessibilitySettings() async {
-    if (Platform.isAndroid) {
-      const AndroidIntent intent = AndroidIntent(
-        action: 'android.settings.ACCESSIBILITY_SETTINGS',
-      );
-      await intent.launch();
-    }
-  }
-
   Future<void> _requestNotificationListenerPermission() async {
     if (Platform.isAndroid) {
       try {
-        await _notificationChannel.invokeMethod('requestPermission');
+        await _nativeChannel.invokeMethod('requestNotificationPermission');
       } catch (e) {
-        print("Error requesting notification permission: $e");
+        print("Error opening settings: $e");
       }
     }
   }
 
+  Future<void> _openAccessibilitySettings() async {
+    await showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text("Important for Android 13+"),
+        content: const SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                "If 'Orbit Shield' is GRAYED OUT and you cannot click it:\n",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text("1. Go to your phone Settings > Apps > Orbit Shield."),
+              Text("2. Tap the 3 dots (top right corner)."),
+              Text("3. Select 'Allow Restricted Settings'."),
+              SizedBox(height: 10),
+              Text("Then come back here and click Enable again."),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _launchAccessibility();
+            },
+            child: const Text("Open Settings"),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _launchAccessibility() async {
+    if (Platform.isAndroid) {
+      try {
+        await _nativeChannel.invokeMethod('requestAccessibilityPermission');
+      } catch (e) {
+        const AndroidIntent intent = AndroidIntent(
+          action: 'android.settings.ACCESSIBILITY_SETTINGS',
+        );
+        await intent.launch();
+      }
+    }
+  }
+
+  // 4. NEW: Request Overlay Permission
+  Future<void> _requestOverlayPermission() async {
+    if (await Permission.systemAlertWindow.isDenied) {
+      await Permission.systemAlertWindow.request();
+    }
+    // Check immediately after returning
+    _checkAllPermissions(); 
+  }
+
   @override
   Widget build(BuildContext context) {
+    // 5. NEW: Add _isOverlayGranted to validation
     final bool canContinue =
         _isCameraGranted &&
         _isCallLogGranted &&
@@ -175,7 +244,7 @@ class _PermissionScreenState extends State<PermissionScreen>
         _isBackgroundLocationGranted &&
         _isBatteryOptimizationDisabled &&
         _isDndAccessGranted &&
-        _isNotificationListenerGranted;
+        _isOverlayGranted; // Added here
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -184,28 +253,16 @@ class _PermissionScreenState extends State<PermissionScreen>
           children: [
             Container(
               padding: const EdgeInsets.all(24.0),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(
-                  bottom: Radius.circular(24),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black12,
-                    blurRadius: 10,
-                    offset: Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
+              // ... Same Header Code ...
+              child: const Column(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.shield_rounded,
                     size: 60,
                     color: Color(0xFF4A90E2),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
+                  SizedBox(height: 16),
+                  Text(
                     'Setup Required',
                     style: TextStyle(
                       fontSize: 24,
@@ -213,8 +270,8 @@ class _PermissionScreenState extends State<PermissionScreen>
                       color: Color(0xFF2D3436),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  const Text(
+                  SizedBox(height: 8),
+                  Text(
                     'To protect this device, please grant the following permissions',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: Colors.grey, fontSize: 14),
@@ -228,6 +285,7 @@ class _PermissionScreenState extends State<PermissionScreen>
                 padding: const EdgeInsets.all(16),
                 children: [
                   _buildSectionLabel("Basic Permissions"),
+                  // ... Camera, Call, SMS, Contacts ...
                   _buildPermissionCard(
                     title: 'Camera',
                     subtitle: 'Needed to scan the QR code',
@@ -286,20 +344,52 @@ class _PermissionScreenState extends State<PermissionScreen>
 
                   const SizedBox(height: 16),
                   _buildSectionLabel("Advanced Monitoring"),
+                  
+                  // 6. NEW: Display Over Other Apps Card
+                  _buildPermissionCard(
+                    title: 'Lock Screen Overlay',
+                    subtitle: 'Required to Lock Device',
+                    icon: Icons.layers,
+                    isGranted: _isOverlayGranted,
+                    onTap: _requestOverlayPermission,
+                  ),
+
+                  _buildPermissionCard(
+                    title: 'Accessibility',
+                    subtitle: _isAccessibilityGranted
+                        ? "Active"
+                        : 'Tap to Enable (Fix Gray Button)',
+                    icon: Icons.accessibility_new,
+                    isGranted: _isAccessibilityGranted,
+                    isActionAlwaysVisible: true,
+                    onTap: _openAccessibilitySettings,
+                    customButtonLabel: "Enable",
+                  ),
+
+                  _buildPermissionCard(
+                    title: 'Notification Access',
+                    subtitle: 'Select "Orbit Shield" > Enable',
+                    icon: Icons.notifications_active,
+                    isGranted: _isNotificationListenerGranted,
+                    isActionAlwaysVisible: true,
+                    onTap: _requestNotificationListenerPermission,
+                    customButtonLabel: "Settings",
+                  ),
+
                   _buildPermissionCard(
                     title: 'Background Activity',
-                    subtitle:
-                        'Set to "No restrictions" or\n"Battery Usage" > Enable "Allow Background Activity"',
+                    subtitle: 'Allow Background Activity',
                     icon: Icons.battery_alert,
                     isGranted: false,
                     isActionAlwaysVisible: true,
                     onTap: _openBackgroundSettings,
                     customButtonLabel: "Settings",
                   ),
+                  
+                  // ... Usage, DND, Battery Opt ...
                   _buildPermissionCard(
                     title: 'App Usage',
-                    subtitle:
-                        'Select "Orbit Shield" > Enable "Permit usage access"',
+                    subtitle: 'Enable "Permit usage access"',
                     icon: Icons.data_usage,
                     isGranted: false,
                     isActionAlwaysVisible: true,
@@ -308,31 +398,11 @@ class _PermissionScreenState extends State<PermissionScreen>
                   ),
                   _buildPermissionCard(
                     title: 'Do Not Disturb',
-                    subtitle:
-                        'Select "Orbit Shield" > Enable "Allow Do Not Disturb"',
+                    subtitle: 'Allow Do Not Disturb',
                     icon: Icons.do_not_disturb_on,
                     isGranted: _isDndAccessGranted,
                     onTap: _requestDndAccess,
                     customButtonLabel: "Settings",
-                  ),
-                  _buildPermissionCard(
-                    title: 'Notification Access',
-                    subtitle:
-                        'Select "Orbit Shield" > Enable "Allow Notification Access"',
-                    icon: Icons.notifications_active,
-                    isGranted: _isNotificationListenerGranted,
-                    onTap: _requestNotificationListenerPermission,
-                    customButtonLabel: "Settings",
-                  ),
-                  _buildPermissionCard(
-                    title: 'Accessibility',
-                    subtitle:
-                        'Select "Downloaded Apps" > Select "Orbit Shield" > Turn it ON',
-                    icon: Icons.accessibility_new,
-                    isGranted: false,
-                    isActionAlwaysVisible: true,
-                    onTap: _openAccessibilitySettings,
-                    customButtonLabel: "Enable",
                   ),
                   _buildPermissionCard(
                     title: 'Battery Optimization',
@@ -342,6 +412,7 @@ class _PermissionScreenState extends State<PermissionScreen>
                     onTap: _requestBatteryOptimization,
                     customButtonLabel: "Disable",
                   ),
+
                   const SizedBox(height: 80),
                 ],
               ),

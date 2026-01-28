@@ -6,6 +6,8 @@ import 'package:orbit_shield/child/child_onboarding_screen.dart';
 import '../firebase_options.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:workmanager/workmanager.dart';
+// 1. ADD THIS IMPORT
+import 'package:permission_handler/permission_handler.dart'; 
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -41,19 +43,33 @@ void main() async {
   );
   final prefs = await SharedPreferences.getInstance();
   final bool hasSeenOnboarding = prefs.getBool('child_onboarding_seen') ?? false;
+  
   runApp(ChildApp(showOnboarding: !hasSeenOnboarding));
 }
 
-class ChildApp extends StatelessWidget {
+// 2. CHANGE TO STATEFUL WIDGET
+class ChildApp extends StatefulWidget {
   final bool showOnboarding;
   const ChildApp({super.key, required this.showOnboarding});
+
+  @override
+  State<ChildApp> createState() => _ChildAppState();
+}
+
+class _ChildAppState extends State<ChildApp> {
+  
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Orbit Shield Child',
-      home: showOnboarding ? const ChildOnboardingScreen() : const ChildAuthWrapper(),
+      // Note: access widget.showOnboarding since we are now in a State class
+      home: widget.showOnboarding ? const ChildOnboardingScreen() : const ChildAuthWrapper(),
     );
   }
 }
