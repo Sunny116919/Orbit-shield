@@ -10,31 +10,42 @@ class UpdateChecker {
     String jsonUrl,
   ) async {
     try {
-      // 1. Check the JSON file on your Firebase Hosting
       final response = await http.get(Uri.parse(jsonUrl));
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
-        // 2. Get current app version from the phone
         PackageInfo packageInfo = await PackageInfo.fromPlatform();
-        String currentVersion = packageInfo.version.replaceAll("v", "").trim();
-        String latestVersion = data['version']
-            .toString()
-            .replaceAll("v", "")
-            .trim();
-        String apkUrl = data['url'];
-        String notes = data['notes'] ?? "Security updates and bug fixes.";
 
-        // 3. Compare: If server version is different, prompt update
+        // 1. Get raw strings
+        String currentRaw = packageInfo.version;
+        String latestRaw = data['version'].toString();
+
+        // 2. CLEAN them (Remove 'v', remove spaces)
+        String currentVersion = currentRaw
+            .replaceAll(RegExp(r'[vV]'), '')
+            .trim();
+        String latestVersion = latestRaw.replaceAll(RegExp(r'[vV]'), '').trim();
+
+        // 3. DEBUG PRINT (Check your "Run" tab in Android Studio!)
+        print("🔎 UPDATE CHECK:");
+        print("   Installed App: '$currentVersion' (Raw: '$currentRaw')");
+        print("   Online JSON:   '$latestVersion' (Raw: '$latestRaw')");
+
+        // 4. Compare
         if (currentVersion != latestVersion) {
           if (context.mounted) {
-            _showUpdateDialog(context, apkUrl, notes, latestVersion);
+            _showUpdateDialog(
+              context,
+              data['url'],
+              data['notes'],
+              latestVersion,
+            );
           }
+        } else {
+          print("✅ App is up to date.");
         }
       }
     } catch (e) {
-      print("Update check failed (App might be offline): $e");
+      print("❌ Update check failed: $e");
     }
   }
 
